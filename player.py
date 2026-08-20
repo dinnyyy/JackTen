@@ -4,10 +4,10 @@ class Player:
     def __init__(self, stack: int):
         pass
 
-    def new_hand(hand):
+    def new_hand(self, hand):
         self.hand = hand
 
-    def start_match(msg):
+    def start_match(self, msg):
         self.seat = msg["your_seat"]
         self.num_players = msg["num_players"]
         self.stack = msg["starting_stack"]
