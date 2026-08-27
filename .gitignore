@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+node_modules/
+.DS_Store
+*.log
+
+# hand histories / generated match data
+data/
+logs/
+*.ndjson
+!poker_bot_messages.md
+
+# model artifacts
+*.pt
+*.pkl
+checkpoints/
