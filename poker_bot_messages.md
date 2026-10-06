@@ -93,4 +93,41 @@ NDJSON over stdin/stdout. Every message has a `"type"` field. `amount` = total s
 ```json
 {"type": "action_response", "action": "raise", "amount": 600}
 ```
-`amount` required for `bet`/`raise`; omitted for `fold`/`check`/`call`. All-in is either its own action type or a `raise` with `amount == your_stack` — pick one convention and document it.
+`amount` required for `bet`/`raise`; omitted for `fold`/`check`/`call`.
+
+## Local engine conventions (`engine/`)
+
+Settled decisions and additive fields. Bots may ignore any extra field.
+
+**All-in:** send `raise` with `amount == max_raise_to`. `"action": "allin"` is also accepted. Calling for less than `to_call` is automatic when your stack is short.
+
+**Invalid responses** never crash a hand:
+- `check` facing a bet becomes `fold`.
+- `fold` when checking is free becomes `check`.
+- `raise` when raising isn't legal becomes `call` or `check`.
+- A raise outside `[min_raise_to, max_raise_to]` is clamped.
+- Timeouts, crashes and garbage become check-or-fold.
+
+`action_taken` carries `corrected` when this happens.
+
+**Extra fields:**
+- `hand_start.posts` — antes and blinds actually posted: `[{"seat", "type": "ante"|"small_blind"|"big_blind", "amount"}]`. `hand_start.stacks` are *before* posting.
+- `action_request.your_bet` — chips you've already put in this street.
+- `min_raise_to`/`max_raise_to` are `0` when `raise` isn't legal.
+- `action_taken.all_in` is a bool. `amount` appears on `call` and `raise` as the street total.
+- `hand_result.pots` — `[{"amount", "eligible", "winners", "shares"}]`, main pot first. `hand_result.uncalled_returned` is `{seat: chips}`. `winners[].amount` excludes your own returned uncalled bet.
+
+**Betting rules (TDA):**
+- **Heads-up:** the button posts the SB, acts first preflop and last postflop.
+- **Short big blind:** a BB all-in for less doesn't lower the call amount.
+- **Min raise:** the size of the last *full* bet or raise on the street, never less than the BB.
+- **Short all-ins:** an all-in below a full raise doesn't reopen betting for players who already acted. It does reopen once several short all-ins add up to a full raise.
+- **No pointless raises:** you can't raise when everyone else is all-in.
+- **Antes** are dead money.
+- **Pots:** each side pot is awarded separately. Uncalled bets are returned.
+- **Odd chips** go to the first winner left of the button.
+- **Showdown order:** the last river aggressor shows first, otherwise the first player left of the button. Later players muck hands that can't win or tie a pot they're in. If anyone is all-in, every hand is tabled.
+
+**Table:**
+- **Moving button:** it advances to the next seat with chips.
+- **Same-hand busts:** the player who started the hand with fewer chips finishes lower.
