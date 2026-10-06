@@ -9,20 +9,67 @@ from a solid baseline strategy only as far as the accumulated evidence actually
 justifies. With no hands observed, it plays its baseline. As reads sharpen, it
 exploits.
 
+## Quick start
+
+Python 3.10+, standard library only.
+
+```bash
+python play.py                     # opens http://127.0.0.1:8765
+python simulate.py --bots "jackten=cmd:python my_bot.py" random caller raiser --matches 500
+python -m unittest discover tests
+```
+
+`play.py` opens a home page with three modes:
+
+| Mode | What you get |
+|---|---|
+| **Play** | You in seat 0 against up to nine bots. Raise slider with pot-size presets, keyboard shortcuts. |
+| **Watch** | Bots only, cards face up. Leaderboard, pause, adjustable speed. |
+| **Simulate** | Parallel matches with live progress, cumulative-winnings and bb/100 charts, a per-bot stats table, and CSV downloads. |
+
+`simulate.py` runs the same simulations from the terminal.
+
+Bot specs:
+
+| Spec | What it is |
+|---|---|
+| `random`, `caller`, `raiser`, `folder` | Built-in bots |
+| `cmd:<command>` | Any program speaking the NDJSON protocol |
+| `py:module:Class` | An in-process Python class |
+| `label=spec` | Any of the above, with a display name |
+
+[`bots/random_bot.py`](bots/random_bot.py) is the template for an external bot.
+
+Each simulation run writes to `data/sims/<run id>/`, which is gitignored:
+
+| File | Contents |
+|---|---|
+| `bot_summary.csv` | Per-bot stats: bb/100 with a 95% CI, placement, VPIP, PFR, 3-bet, AF, WTSD, W$SD |
+| `matches.csv` | Final stack and finishing place per seat per match |
+| `hands.csv` | One row per player per hand: cards, position, result, HUD flags |
+| `actions.csv` | Every decision with the context the bot saw (pot, to_call, legal actions), what it did, and think time |
+| `pots.csv` | Every main and side pot, with eligibility and winners |
+| `cumulative_winnings.csv` | Running net bb per bot |
+| `errors.csv` | Bot timeouts and invalid responses |
+| `histories/*.ndjson` | Raw protocol logs |
+
+Every column is documented in [`docs/sim_outputs.md`](docs/sim_outputs.md). `hole_cards` columns hold ground truth for every player, including folded hands.
+
 ## Status
 
-Early. The engine interface is specified; the bot is not yet built.
+Early. The engine and harness are built; the bot is not.
 
 | Component | State |
 |---|---|
 | Engine protocol spec | Documented — [`poker_bot_messages.md`](poker_bot_messages.md) |
-| Phase 0 — protocol I/O + harness | Not started |
+| Local engine, web app (play / watch / simulate), CSV export | Built — `engine/`, `ui/`, `play.py`, `simulate.py` |
+| Phase 0 — bot-side protocol I/O | Not started (template: `bots/random_bot.py`) |
 | Phase 1 — baseline strategy | Not started |
 | Phase 2 — mixture-model opponent typing | Designed, not started |
 | Phase 3 — neural opponent embeddings | Designed, not started |
 | Phase 4 — likelihood-trained value net | Designed, not started |
 
-Nothing below is implemented. [`ROADMAP.md`](ROADMAP.md) is the build plan and
+Nothing in the architecture below is implemented yet. [`ROADMAP.md`](ROADMAP.md) is the build plan and
 carries the statistical detail.
 
 ## Engine interface
@@ -89,10 +136,8 @@ reason the usual test for "how many types are there?" does not apply here.
 
 ## Open spec decisions
 
-Carried over from the protocol reference, still to settle:
-
-- **All-in convention.** Either its own action type, or a `raise` with
-  `amount == your_stack`. Pick one and document it.
+- **All-in convention.** Settled for the local engine: `raise` to `max_raise_to`
+  (`allin` is accepted too). See the conventions section of the protocol reference.
 - **Time bank policy.** `time_per_action_ms` is 5000 with a 30s bank; the
   decision policy needs a budget rule, especially once Phase 3/4 inference is in
   the hot path.

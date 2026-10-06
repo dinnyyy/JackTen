@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JackTen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page home">
+<header class="topbar">
+  <a class="brand" href="/"><span class="brand-mark">J<span>♠</span>10</span> JackTen</a>
+  <nav class="nav"><a href="/" class="active">Home</a><a href="/table">Table</a><a href="/sim">Simulations</a></nav>
+</header>
+
+<main class="home-main">
+  <section class="hero">
+    <h1>Pick a seat.</h1>
+    <p>No-Limit Hold'em engine for building and testing JackTen. Play the bots yourself,
+      sit back and watch them, or run thousands of hands and take the numbers home.</p>
+  </section>
+
+  <div id="resume"></div>
+
+  <section class="modes" role="tablist" aria-label="Mode">
+    <button class="mode" role="tab" data-mode="play" aria-selected="false">
+      <div class="mode-art" aria-hidden="true">
+        <div class="mini-card">A<i>♠</i></div><div class="mini-card red">K<i>♥</i></div>
+      </div>
+      <h2>Play</h2>
+      <p>Take seat 0 against up to nine bots. Your cards, your decisions.</p>
+    </button>
+    <button class="mode" role="tab" data-mode="watch" aria-selected="false">
+      <div class="mode-art" aria-hidden="true">
+        <div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card back"></div>
+      </div>
+      <h2>Watch</h2>
+      <p>Bots only, cards face up. Pause, slow it down, see how they play.</p>
+    </button>
+    <button class="mode" role="tab" data-mode="simulate" aria-selected="false">
+      <div class="mode-art" aria-hidden="true">
+        <svg viewBox="0 0 96 48" class="mini-chart"><polyline points="2,40 18,34 30,36 44,22 58,26 72,12 94,6"/><polyline class="b" points="2,40 18,42 30,38 44,40 58,36 72,40 94,44"/></svg>
+      </div>
+      <h2>Simulate</h2>
+      <p>Run many matches in parallel. Charts, stats, and every hand as CSV.</p>
+    </button>
+  </section>
+
+  <section class="config" id="config" hidden>
+    <form id="form" autocomplete="off">
+      <div class="config-grid">
+        <div>
+          <h3 id="lineupTitle">Opponents</h3>
+          <p class="hint" id="lineupHint"></p>
+          <div id="lineup"></div>
+        </div>
+        <div>
+          <h3>Table</h3>
+          <div class="grid">
+            <label>Starting stack <input name="stack" type="number" min="1" value="20000"></label>
+            <label>Small blind <input name="sb" type="number" min="1" value="50"></label>
+            <label>Big blind <input name="bb" type="number" min="1" value="100"></label>
+            <label>Ante <input name="ante" type="number" min="0" value="0"></label>
+            <label>Max hands per match <input name="hands" type="number" min="1" value="500"></label>
+            <label>Double blinds every <input name="blind_up" type="number" min="0" value="0" title="0 = fixed blinds"></label>
+          </div>
+          <div class="grid sim-only">
+            <label>Matches <input name="matches" type="number" min="1" value="200"></label>
+            <label>Seed <input name="seed" type="number" placeholder="random"></label>
+            <label>Worker processes <input name="workers" type="number" min="1"></label>
+          </div>
+          <div class="checks sim-only">
+            <label><input type="checkbox" name="csv_detail" checked> Detailed CSVs <span class="hint">— every hand, action and pot</span></label>
+            <label><input type="checkbox" name="log" checked> NDJSON hand histories <span class="hint">— raw protocol logs</span></label>
+          </div>
+          <div class="grid watch-only">
+            <label>Seconds between actions <input name="speed" type="number" min="0" max="5" step="0.1" value="0.7"></label>
+          </div>
+        </div>
+      </div>
+      <div class="config-actions">
+        <span class="form-error" id="formError" role="alert"></span>
+        <button type="submit" class="btn primary big" id="go">Deal me in</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<script src="common.js"></script>
+<script src="home.js"></script>
+</body>
+</html>
