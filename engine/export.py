@@ -1,7 +1,10 @@
 """CSV export of simulation results.
 
-During a run, each match writes its own part files via CsvExporter (an
-observer); afterwards combine_parts() concatenates them into one CSV per table.
+During a run, CsvExporter (an observer) appends rows to one headerless part
+file per worker process per table; afterwards combine_parts() concatenates
+them into one CSV per table. (One file per match was far slower on Windows,
+where creating and deleting thousands of small files dominates.) Rows are
+grouped by worker, so sort by `match`, `hand` if order matters.
 The column reference lives in docs/sim_outputs.md and in TABLES below.
 """
 
@@ -51,6 +54,23 @@ def positions(seats: list[int], button: int) -> dict[int, str]:
     return dict(zip(order, names))
 
 
+_open_parts: dict[tuple[str, str], tuple] = {}   # (parts_dir, table) -> (file, writer), per process
+
+
+def _part_writer(parts_dir: str, table: str):
+    key = (parts_dir, table)
+    if key not in _open_parts:
+        f = open(os.path.join(parts_dir, f"{table}_{os.getpid()}.csv"), "a", newline="", encoding="utf-8")
+        _open_parts[key] = (f, csv.DictWriter(f, fieldnames=TABLES[table][1]))
+    return _open_parts[key]
+
+
+def close_parts():
+    for f, _ in _open_parts.values():
+        f.close()
+    _open_parts.clear()
+
+
 class CsvExporter:
     def __init__(self, parts_dir: str, match_index: int, seed: int, labels: list[str],
                  tables=("actions", "hands", "pots", "matches", "errors")):
@@ -59,10 +79,7 @@ class CsvExporter:
         self.labels = labels
         self.files, self.w = {}, {}
         for t in tables:
-            f = open(os.path.join(parts_dir, f"{t}_{match_index:05d}.csv"), "w", newline="", encoding="utf-8")
-            self.files[t] = f
-            self.w[t] = csv.DictWriter(f, fieldnames=TABLES[t][1])
-            self.w[t].writeheader()
+            self.files[t], self.w[t] = _part_writer(parts_dir, t)
         self.hand = None
 
     def _row(self, table, **row):
@@ -135,7 +152,7 @@ class CsvExporter:
                           net_chips=final - self.starting_stack, place=place[s],
                           busted=int(final == 0), hands_played=m["hands_played"])
             for f in self.files.values():
-                f.close()
+                f.flush()  # the worker process keeps the file open for its next match
         elif t == "match_start":
             self.starting_stack = m["starting_stack"]
 
@@ -181,15 +198,17 @@ def combine_parts(parts_dir: str, out_dir: str) -> dict[str, int]:
         if not parts:
             continue
         n = 0
-        with open(os.path.join(out_dir, f"{table}.csv"), "w", newline="", encoding="utf-8") as out:
-            out.write(",".join(TABLES[table][1]) + "\n")
+        with open(os.path.join(out_dir, f"{table}.csv"), "wb") as out:
+            out.write((",".join(TABLES[table][1]) + "\r\n").encode())
             for p in parts:
-                with open(p, encoding="utf-8") as f:
-                    next(f, None)                 # skip the part's header
-                    for line in f:
-                        out.write(line)
-                        n += 1
-                os.remove(p)
+                with open(p, "rb") as f:
+                    data = f.read()
+                out.write(data)
+                n += data.count(b"\n")
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
         counts[table] = n
     try:
         os.rmdir(parts_dir)

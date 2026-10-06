@@ -43,7 +43,7 @@ DEFAULTS = {
     "workers": max(1, (os.cpu_count() or 2) - 1),
     "time_ms": 5000,
     "bank_ms": 30000,
-    "out": os.path.join("data", "sims"),
+    "out": os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "sims"),
     "log": True,
     "csv_detail": True,
 }
@@ -173,7 +173,9 @@ def run_simulation(params: dict, on_progress=None, cancel=None) -> dict:
             if done and on_progress:
                 on_progress(len(results), len(jobs), hands, time.time() - t0)
     finally:
-        pool.shutdown(wait=not cancelled, cancel_futures=True)
+        # wait even when cancelling: running matches finish (≤ one match each) and
+        # their worker processes exit, which closes their CSV part files
+        pool.shutdown(wait=True, cancel_futures=True)
 
     summary = {
         "id": run_id,
