@@ -63,11 +63,16 @@ Early. The engine and harness are built; the bot is not.
 |---|---|
 | Engine protocol spec | Documented — [`poker_bot_messages.md`](poker_bot_messages.md) |
 | Local engine, web app (play / watch / simulate), CSV export | Built — `engine/`, `ui/`, `play.py`, `simulate.py` |
-| Phase 0 — bot-side protocol I/O | Not started (template: `bots/random_bot.py`) |
-| Phase 1 — baseline strategy | Not started |
-| Phase 2 — mixture-model opponent typing | Designed, not started |
-| Phase 3 — neural opponent embeddings | Designed, not started |
-| Phase 4 — likelihood-trained value net | Designed, not started |
+| Foundation — bot-side protocol I/O | Not started (template: `bots/random_bot.py`) |
+| Phase 0 — combinatorics | Done — `bot/combinatorics.py` |
+| Phases 1–5 — equity, pot odds and EV, multiway, ranges, sizing | Not started |
+| Phase 6 — opponent statistics (Beta-Binomial) | Not started |
+| Phase 7 — exploitation | Not started |
+| Phase 8 — evaluation statistics | Partly built (bb/100 and CI in `engine/stats.py`) |
+| Phase 9 — ML policy layer | Not started |
+| Phase 10 — mixture-model opponent typing | Designed, not started |
+| Phase 11 — neural opponent embeddings | Designed, not started |
+| Phase 12 — likelihood-trained value net | Designed, not started |
 
 Nothing in the architecture below is implemented yet. [`ROADMAP.md`](ROADMAP.md) is the build plan and
 carries the statistical detail.
@@ -88,7 +93,7 @@ the design below:
 - **`hand_result`** — broadcast at end of hand, including showdown hole cards
   where players showed, and `null` where they mucked.
 
-Two properties of that data shape the modelling approach in Phase 2:
+Two properties of that data shape the modelling approach in Phase 10:
 
 1. **Actions are fully observed.** Every fold, call and raise by every opponent
    is visible, for every hand, whether or not it reaches showdown. An opponent
@@ -96,7 +101,7 @@ Two properties of that data shape the modelling approach in Phase 2:
 2. **Hole cards are not.** They appear only when a player chooses to show, and
    that choice correlates with what they're holding. Any model of "what were
    they holding given how they played" fitted on showdown data alone is fitted
-   on a self-selected sample and will be biased. Phase 2 deliberately avoids
+   on a self-selected sample and will be biased. Phase 10 deliberately avoids
    depending on it.
 
 ## Planned architecture
@@ -127,7 +132,7 @@ Classifying opponents would need labelled data — hands where someone has alrea
 written down "this player is a nit." That data does not exist, and hand-labelling
 it just encodes the labeller's priors.
 
-The Phase 2 approach instead assumes only that the player pool is a *mixture* of
+The Phase 10 approach instead assumes only that the player pool is a *mixture* of
 some number of unobserved types, and lets maximum likelihood recover what those
 types are, how common each is, and the probability that any given opponent
 belongs to each. The types are discovered, not defined. See
@@ -139,5 +144,5 @@ reason the usual test for "how many types are there?" does not apply here.
 - **All-in convention.** Settled for the local engine: `raise` to `max_raise_to`
   (`allin` is accepted too). See the conventions section of the protocol reference.
 - **Time bank policy.** `time_per_action_ms` is 5000 with a 30s bank; the
-  decision policy needs a budget rule, especially once Phase 3/4 inference is in
+  decision policy needs a budget rule, especially once Phase 11/12 inference is in
   the hot path.
