@@ -17,3 +17,6 @@ class Player:
         self.num_hands = msg["num_hands"]
         self.time_bank = msg["time_bank_ms"]
         self.other_bots = msg["bot_names"]
+
+    def decide(self, msg):
+        
