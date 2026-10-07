@@ -5,8 +5,10 @@ import random
 import math
 
 def showdown(hero_score, opp, board):
-    """Idea is the simulation produces len(opps) possibilities for opponents, which we evaluate our average score"""
-   
+    """Score one opponent hand against the hero on a full 5-card board: 1 win, 0.5 tie, 0 loss.
+
+    hero_score is evaluate(hero + board), computed once by the caller and reused.
+    """
     opp_score = evaluate(list(opp) + board)
     if hero_score>opp_score:
         return 1
@@ -16,6 +18,12 @@ def showdown(hero_score, opp, board):
 
 
 def equity_exact(hero, board):
+    """Exact equity vs one random hand: enumerate every opponent hand and every runout.
+
+    hero and board are lists of card ints. Cheap on the river (about 1k evaluations), about 45k on the turn and 1M on the
+    flop, so use Monte Carlo before the river at the table.
+    """
+    hero, board = list(hero), list(board)
     num_remaining = 5-len(board)
     score = 0
     i = 0
@@ -34,7 +42,11 @@ def equity_exact(hero, board):
     return score/i
 
 def equity_monte_carlo(hero, board, n, rng=None):
-    if rng==None:
+    """Monte Carlo equity vs one random hand. Returns (equity, standard_error)."""
+    if n < 1:
+        raise ValueError("n must be at least 1")
+    hero, board = list(hero), list(board)
+    if rng is None:
         rng = random.Random()
 
     score = 0
@@ -50,3 +62,14 @@ def equity_monte_carlo(hero, board, n, rng=None):
     se = math.sqrt(score*(1-score)/n)
     return score, se
 
+
+
+def estimate_equity(hero, board, rng=None, n=2000):
+    """Equity vs one random hand, exact on the river, Monte Carlo before it.
+
+    Exact on the turn took about 600 ms a decision (45k evaluations), so it is sampled.
+    Returns (equity, standard_error); the error is 0 for exact results.
+    """
+    if len(board) == 5:
+        return equity_exact(hero, board), 0.0
+    return equity_monte_carlo(hero, board, n, rng)

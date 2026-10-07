@@ -1,7 +1,7 @@
 """Bot entry point: reads engine messages on stdin, answers action_requests on stdout.
 
 Run from the repo root:  python -m bot.main
-Placeholder policy (check, else fold) until the equity and EV phases land.
+Policy lives in bot/player.py (equity vs pot odds).
 """
 
 import json
@@ -10,10 +10,18 @@ import sys
 from bot.player import Player
 
 
-def decide(state: dict) -> dict:
-    """state is the parsed action_request dict. Return an action dict."""
+def safe_action(state: dict) -> dict:
     action = "check" if "check" in state["legal_actions"] else "fold"
     return {"type": "action_response", "action": action}
+
+
+def decide(player: Player, state: dict) -> dict:
+    """state is the parsed action_request dict. Never raises: any error means check/fold."""
+    try:
+        return player.decide(state)
+    except Exception as e:
+        print(f"decide failed: {e!r}", file=sys.stderr, flush=True)
+        return safe_action(state)
 
 
 def main():
@@ -24,7 +32,7 @@ def main():
             continue
         msg = json.loads(line)
         if msg["type"] == "action_request":
-            print(json.dumps(decide(msg)), flush=True)
+            print(json.dumps(decide(player, msg)), flush=True)
         elif msg["type"] == "hand_start":
             player.new_hand(msg["your_hole_cards"])
         elif msg["type"] == "match_start":
