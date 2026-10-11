@@ -93,14 +93,3 @@ def equity_monte_carlo(hero, board, n, rng=None, potential=False, target_se=None
     ppot = (hp[0][2] + hp[0][1] / 2 + hp[1][2] / 2) / (behind + tied / 2) if behind + tied else None
     npot = (hp[2][0] + hp[2][1] / 2 + hp[1][0] / 2) / (ahead + tied / 2) if ahead + tied else None
     return equity, se, ppot, npot
-
-
-def estimate_equity(hero, board, rng=None, n=2000):
-    """Equity vs one random hand, exact on the river, Monte Carlo before it.
-
-    Exact on the turn took about 600 ms a decision (45k evaluations), so it is sampled.
-    Returns (equity, standard_error); the error is 0 for exact results.
-    """
-    if len(board) == 5:
-        return equity_exact(hero, board), 0.0
-    return equity_monte_carlo(hero, board, n, rng)

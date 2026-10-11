@@ -5,7 +5,7 @@ import random
 import unittest
 
 from bot.combinatorics import parse_cards
-from bot.equity import equity_exact, equity_monte_carlo, estimate_equity
+from bot.equity import equity_exact, equity_monte_carlo
 from bot.player import Player
 
 
@@ -84,13 +84,14 @@ class TestEquity(unittest.TestCase):
         self.assertEqual(len(out), 4)
         self.assertLessEqual(out[1], 0.0105)
 
-    def test_estimate_exact_on_river_sampled_on_turn(self):
+    def test_read_hand_exact_on_river_sampled_on_turn(self):
+        p = Player()
+        p.rng = random.Random(2)
         hero = parse_cards("As Ah")
-        eq, se = estimate_equity(hero, parse_cards("2c 7d 9h Js 3c"))
-        self.assertEqual((se, round(eq, 4)), (0.0, 0.8773))
-        eq, se = estimate_equity(hero, parse_cards("2c 7d 9h Js"), random.Random(2))
-        self.assertGreater(se, 0)
-        self.assertLess(abs(eq - 0.84879), 3 * se)
+        self.assertEqual(p.read_hand(hero, parse_cards("2c 7d 9h Js 3c")), (equity_exact(hero, parse_cards("2c 7d 9h Js 3c")), 0.0, 0.0))
+        eq, ppot, npot = p.read_hand(hero, parse_cards("2c 7d 9h Js"))
+        self.assertLess(abs(eq - 0.84879), 0.03)
+        self.assertGreater(npot, 0)
 
 
 class TestDecide(unittest.TestCase):
