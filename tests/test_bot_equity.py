@@ -26,6 +26,20 @@ class TestEquity(unittest.TestCase):
         eq, se = equity_monte_carlo(hero, board, 4000, random.Random(7))
         self.assertLess(abs(eq - exact), 2 * se + 1e-9)
 
+    def test_potential_flush_draw_and_made_hand(self):
+        # flush draw on the flop: behind often, improves often; no outs from a monster
+        _, _, ppot, npot = equity_monte_carlo(parse_cards("As Ks"), parse_cards("Qs 7s 2d"), 6000, random.Random(3), potential=True)
+        self.assertGreater(ppot, 0.3)
+        _, _, ppot2, npot2 = equity_monte_carlo(parse_cards("Ah Ad"), parse_cards("As Ac 2d"), 6000, random.Random(3), potential=True)
+        self.assertLess(npot2, 0.05)
+
+    def test_potential_matches_equity_and_rejects_preflop(self):
+        hero, board = parse_cards("Ks Qd"), parse_cards("Kh 7d 2c 9s")
+        eq, se, _, _ = equity_monte_carlo(hero, board, 4000, random.Random(5), potential=True)
+        self.assertLess(abs(eq - equity_exact(hero, board)), 3 * se)
+        with self.assertRaises(ValueError):
+            equity_monte_carlo(hero, [], 10, potential=True)
+
     def test_aa_preflop_about_85(self):
         eq, se = equity_monte_carlo(parse_cards("Ah As"), [], 10000, random.Random(1))
         self.assertLess(abs(eq - 0.852), 4 * se)
@@ -79,6 +93,12 @@ class TestDecide(unittest.TestCase):
         # medium hand, tiny bet into a big pot: price is far below equity
         r = self.p.decide(self.req(["Th", "9d"], ["Tc", "4d", "2s", "7h"], to_call=50, pot=2000,
                                    legal=["fold", "call"]))
+        self.assertEqual(r["action"], "call")
+
+    def test_flush_draw_calls_a_price_above_its_raw_equity(self):
+        # 9s8s on Qs7s2d: equity about 0.56, ppot about 0.49. Needed equity is 0.60, so raw pot odds fold;
+        # the implied-odds discount from ppot (0.60 * 0.89 = 0.53) makes it a call.
+        r = self.p.decide(self.req(["9s", "8s"], ["Qs", "7s", "2d"], to_call=1500, pot=1000))
         self.assertEqual(r["action"], "call")
 
 

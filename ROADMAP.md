@@ -31,11 +31,11 @@ Engine, simulator and hand-history logging are built. Still to do:
 
 ## Phase 1: Equity
 
-- [ ] Hand strength vs a random hand: win = 1, tie = 0.5, loss = 0
-- [ ] Exact enumeration from the flop on
+- [x] Hand strength vs a random hand: win = 1, tie = 0.5, loss = 0
+- [x] Exact enumeration from the flop on
 - [ ] Monte Carlo preflop, with `n` chosen from `SE = √(p(1−p)/n)`
-- [ ] Return equity and standard error together
-- [ ] Positive potential (behind now, improves) and negative potential (ahead now, outdrawn)
+- [x] Return equity and standard error together
+- [x] Positive potential (behind now, improves) and negative potential (ahead now, outdrawn)
 
 **Done when:** Monte Carlo matches enumeration within 2 SE, and SE shrinks as `1/√n` in a test.
 
