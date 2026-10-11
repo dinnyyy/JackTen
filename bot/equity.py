@@ -51,16 +51,38 @@ def equity_monte_carlo(hero, board, n, rng=None):
 
     score = 0
     combos = live_combos(hero, board)
+    hero_now = evaluate(hero + board)
+    curr_win_score = 0
+    curr_lose_score = 0
+    start_losing = 0
+    start_winning = 0
+    winning = None
     for i in range(n):
-        random_hand = rng.choice(combos)
-        deck = remaining_deck(hero, random_hand, board)
+        opp = rng.choice(combos)
+        opp_now = evaluate(opp + board)
+        if opp_now>hero_now:
+            winning = False
+            start_losing += 1
+        else:
+            winning = True
+            start_winning += 1
+        deck = remaining_deck(hero, opp, board)
         sample = rng.sample(deck, 5 - len(board))
         full_board = sample + board
         hero_score = evaluate(hero+full_board)
-        score += showdown(hero_score, random_hand, full_board)
+        eval = showdown(hero_score, opp, full_board)
+        score += eval
+        if winning and eval ==0:
+            curr_win_score += 1
+        elif not winning and eval>0:
+            curr_lose_score += 1
+
+    Ppot = curr_lose_score/start_losing
+    Npot = curr_win_score/start_winning
+
     score = score/n
     se = math.sqrt(score*(1-score)/n)
-    return score, se
+    return score, se, Ppot, Npot
 
 
 
@@ -72,4 +94,5 @@ def estimate_equity(hero, board, rng=None, n=2000):
     """
     if len(board) == 5:
         return equity_exact(hero, board), 0.0
-    return equity_monte_carlo(hero, board, n, rng)
+    hs, se, Ppot, Npot = equity_monte_carlo(hero, board, n, rng)
+    return (hs*(1-Npot)+(1-hs)*Ppot), se
