@@ -41,13 +41,17 @@ def equity_exact(hero, board):
 
     return score/i
 
-def equity_monte_carlo(hero, board, n, rng=None, potential=False):
+def equity_monte_carlo(hero, board, n, rng=None, potential=False, target_se=None, batch=200):
     """Monte Carlo equity vs one random hand. Returns (equity, standard_error).
 
     With potential=True, the same simulation also tallies hand potential and returns
     (equity, standard_error, ppot, npot). ppot: chance of finishing ahead given behind now. npot: chance of finishing
     behind given ahead now. Ties count half (Billings). Needs a flop or turn board; a potential is None if no
     sample started in the state it conditions on.
+
+    With target_se, n is a cap: after every `batch` samples it stops once the standard error is at or below the target.
+    The check uses add-one smoothed equity, so a lucky run of all wins or all losses cannot end it early at SE = 0.
+    The SE returned is for the samples actually used.
     """
     if n < 1:
         raise ValueError("n must be at least 1")
@@ -63,6 +67,7 @@ def equity_monte_carlo(hero, board, n, rng=None, potential=False):
         # hp[start][final]: 0 = behind, 1 = tied, 2 = ahead; start on the current board, final at showdown
         hp = [[0, 0, 0] for _ in range(3)]
     score = 0
+    used = 0
     for _ in range(n):
         opp = rng.choice(combos)
         deck = remaining_deck(hero, opp, board)
@@ -73,9 +78,14 @@ def equity_monte_carlo(hero, board, n, rng=None, potential=False):
             opp_now = evaluate(list(opp) + board)
             start = 2 if hero_now > opp_now else 1 if hero_now == opp_now else 0
             hp[start][int(result * 2)] += 1
+        used += 1
+        if target_se is not None and used % batch == 0:
+            p = (score + 1) / (used + 2)
+            if math.sqrt(p * (1 - p) / used) <= target_se:
+                break
 
-    equity = score / n
-    se = math.sqrt(equity * (1 - equity) / n)
+    equity = score / used
+    se = math.sqrt(equity * (1 - equity) / used)
     if not potential:
         return equity, se
 

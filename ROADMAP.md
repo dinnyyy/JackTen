@@ -33,7 +33,7 @@ Engine, simulator and hand-history logging are built. Still to do:
 
 - [x] Hand strength vs a random hand: win = 1, tie = 0.5, loss = 0
 - [x] Exact enumeration from the flop on
-- [ ] Monte Carlo preflop, with `n` chosen from `SE = √(p(1−p)/n)`
+- [x] Monte Carlo preflop, with `n` chosen from `SE = √(p(1−p)/n)`
 - [x] Return equity and standard error together
 - [x] Positive potential (behind now, improves) and negative potential (ahead now, outdrawn)
 

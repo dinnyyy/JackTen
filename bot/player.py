@@ -8,7 +8,8 @@ BET_FRACTION = 0.75   # raise size as a fraction of the pot
 IMPLIED = 0.30        # call price is cut by IMPLIED * ppot: a draw that hits wins more later
 REVERSE = 0.30        # call price is raised by REVERSE * npot: a hand that gets outdrawn loses more later
 PROTECT = 0.10        # raise threshold is cut by PROTECT * npot: charge the draws while ahead
-N_SAMPLES = 2000
+TARGET_SE = 0.01      # stop sampling once equity's standard error is this small
+N_MAX = 10000         # cap on samples per decision
 
 
 class Player:
@@ -38,8 +39,8 @@ class Player:
         if len(board) == 5:
             return equity_exact(hero, board), 0.0, 0.0
         if len(board) == 0:
-            return equity_monte_carlo(hero, board, N_SAMPLES, self.rng)[0], 0.0, 0.0
-        equity, _, ppot, npot = equity_monte_carlo(hero, board, N_SAMPLES, self.rng, potential=True)
+            return equity_monte_carlo(hero, board, N_MAX, self.rng, target_se=TARGET_SE)[0], 0.0, 0.0
+        equity, _, ppot, npot = equity_monte_carlo(hero, board, N_MAX, self.rng, potential=True, target_se=TARGET_SE)
         return equity, ppot or 0.0, npot or 0.0
 
     def decide(self, msg) -> dict:

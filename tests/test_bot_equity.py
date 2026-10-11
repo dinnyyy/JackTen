@@ -56,6 +56,34 @@ class TestEquity(unittest.TestCase):
         b = equity_monte_carlo(hero, [], 500, random.Random(5))
         self.assertEqual(a, b)
 
+    def test_target_se_stops_early_and_hits_target(self):
+        class Counting(random.Random):
+            calls = 0
+
+            def choice(self, seq):
+                self.calls += 1
+                return super().choice(seq)
+
+        lopsided, close = Counting(4), Counting(4)
+        _, se_a = equity_monte_carlo(parse_cards("Ah As"), [], 20000, lopsided, target_se=0.01)
+        _, se_b = equity_monte_carlo(parse_cards("Kh 7s"), [], 20000, close, target_se=0.01)
+        self.assertLess(lopsided.calls, close.calls)
+        self.assertLessEqual(lopsided.calls, 20000)
+        self.assertLess(close.calls, 20000)
+        self.assertLessEqual(se_a, 0.01)
+        self.assertLessEqual(se_b, 0.0105)
+
+    def test_target_se_caps_at_n(self):
+        c = random.Random(1)
+        _, se = equity_monte_carlo(parse_cards("Kh 7s"), [], 400, c, target_se=0.0001)
+        self.assertGreater(se, 0.0001)
+
+    def test_target_se_with_potential(self):
+        out = equity_monte_carlo(parse_cards("9s 8s"), parse_cards("Qs 7s 2d"), 5000, random.Random(2),
+                                 potential=True, target_se=0.01)
+        self.assertEqual(len(out), 4)
+        self.assertLessEqual(out[1], 0.0105)
+
     def test_estimate_exact_on_river_sampled_on_turn(self):
         hero = parse_cards("As Ah")
         eq, se = estimate_equity(hero, parse_cards("2c 7d 9h Js 3c"))
