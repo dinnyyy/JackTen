@@ -124,12 +124,3 @@ class TestDecide(unittest.TestCase):
                                    legal=["fold", "call"]))
         self.assertEqual(r["action"], "call")
 
-    def test_flush_draw_calls_a_price_above_its_raw_equity(self):
-        # 9s8s on Qs7s2d: equity about 0.56, ppot about 0.49. Needed equity is 0.60, so raw pot odds fold;
-        # the implied-odds discount from ppot (0.60 * 0.89 = 0.53) makes it a call.
-        r = self.p.decide(self.req(["9s", "8s"], ["Qs", "7s", "2d"], to_call=1500, pot=1000))
-        self.assertEqual(r["action"], "call")
-
-
-if __name__ == "__main__":
-    unittest.main()

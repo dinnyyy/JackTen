@@ -1,6 +1,6 @@
 import unittest
 
-from bot.exp_value import bbf, calc_ev, equity_to_call, ev_call, ev_raise, mdf, spr
+from bot.exp_value import bbf, calc_ev, equity_to_call, equity_when_called, ev_call, ev_raise, mdf, spr
 
 
 class TestExpValue(unittest.TestCase):
@@ -59,6 +59,20 @@ class TestExpValue(unittest.TestCase):
     def test_rake_makes_calls_worse(self):
         self.assertLess(ev_call(100, 50, 0.4, rake=0.05), ev_call(100, 50, 0.4))
         self.assertGreater(equity_to_call(50, 100, 0.05), equity_to_call(50, 100))
+
+    def test_equity_when_called(self):
+        self.assertEqual(equity_when_called(0.2, 1 / 3), 0.0)         # a bluff wins nothing when called
+        self.assertAlmostEqual(equity_when_called(0.5, 0.5), 0.0)
+        self.assertAlmostEqual(equity_when_called(1.0, 0.5), 1.0)
+        self.assertAlmostEqual(equity_when_called(0.75, 0.5), 0.5)
+
+    def test_weak_hands_do_not_bluff_raise(self):
+        for e in (0.0, 0.05, 0.1, 0.3):
+            action, _ = calc_ev(1000, 0, e, ["check", "raise"], 200, 100000)
+            self.assertEqual(action, "check")
+
+    def test_spr_zero_pot(self):
+        self.assertEqual(spr(1000, 0), float("inf"))
 
 
 if __name__ == "__main__":

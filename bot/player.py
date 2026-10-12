@@ -40,10 +40,9 @@ class Player:
         return equity, ppot or 0.0, npot or 0.0
 
     def decide(self, msg) -> dict:
-        """Phase 1 to 2 policy: equity vs one random hand against pot odds, shaded by hand potential.
+        """Phase 2 policy: pick fold / check / call / raise by EV, from equity vs one random hand.
 
-        free to act: raise with strong equity, else check
-        facing a bet: fold below the pot-odds threshold, raise when very strong, else call
+        Raise sizes and the fold probability come from exp_value.calc_ev. ppot and npot are computed but not used yet.
         """
         legal = msg["legal_actions"]
         hero = parse_cards(" ".join(self.hand))
