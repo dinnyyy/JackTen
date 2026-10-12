@@ -57,14 +57,17 @@ Every column is documented in [`docs/sim_outputs.md`](docs/sim_outputs.md). `hol
 
 ## Bot versions
 
-Each version is a frozen copy of the bot in its own package, so versions can play each other in `simulate.py`. `bot/` is the working copy and currently matches `bot_v2`.
+Each version is a frozen copy of the bot in its own package, so versions can play each other in `simulate.py`. `bot/` is the working copy and currently matches `bot_v3`.
 
 | Version | Package | Features |
 |---|---|---|
 | **v1** | `bot_v1/` | <ul><li>Phase 1 baseline: equity vs one random hand</li><li>Exact enumeration from the flop, Monte Carlo preflop (fixed 2,000 samples)</li><li>Call when equity beats pot odds, `call / (pot + call)`</li><li>Raise at 70% equity or more, sized at 0.75 of the pot</li><li>Check when free, always-legal fallback action</li></ul> |
 | **v2** | `bot_v2/` | <ul><li>Everything in v1</li><li>Hand potential from the same simulation: positive (behind now, improves) and negative (ahead now, outdrawn)</li><li>Call price cut by 0.30 &times; positive potential (implied odds) and raised by 0.30 &times; negative potential (reverse implied odds)</li><li>Raise threshold lowered by 0.10 &times; negative potential, to charge draws</li><li>Monte Carlo sample count set by standard error: stop at SE 0.01, capped at 10,000 samples</li></ul> |
+| **v3** | `bot_v3/` | <ul><li>Phase 2: decisions by expected value, replacing v2's fixed 70% raise line and potential shading</li><li>EV of fold, check, call and raise, with raise sizes of 0.5, 0.75 and 1.0 of the pot clamped to the legal range</li><li>Opponent fold probability from break-even bluff frequency (a neutral opponent defends at the minimum defence frequency)</li><li>Equity against the hands that call a raise, so weak hands stop bluffing for free</li><li>Minimum-defence floor when facing a bet, SPR, and a rake parameter (default 0)</li><li>Hand potential is still computed but no longer used</li></ul> |
 
 Head-to-head (3000 matches, 100,000 stacks, 50/100 blinds): v2 is statistically indistinguishable from v1, at -3.3 BB per seat per match &plusmn; 35.8 (95% CI). It still plays loose and passive (about 61% VPIP, 2.8% PFR) because both versions compare equity against one random hand.
+
+v3 against three always-call bots (22,600 hands): +582 bb/100 &plusmn; 145 (95% CI). Not yet compared with v1 or v2 head-to-head.
 
 ## Status
 
