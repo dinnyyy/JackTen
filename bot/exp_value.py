@@ -7,7 +7,7 @@ def equity_to_call(call, pot):
 
 
 def fold_prob(pot, bet):
-    return 0.4
+    return bet / (pot + bet)
 
 
 def ev_call(pot, to_call, equity):
@@ -39,3 +39,23 @@ def calc_ev(pot, to_call, equity, legal, min_raise_to, max_raise_to, fractions=B
             if ev > best_ev:
                 best, best_ev = ("raise", raise_to), ev
     return best
+
+def bbf(bet, pot):
+    """Checks if a fold will return profits. Its an fold threshold, if an
+    oponent folds more thant this, a pure bluff will profit. when equity = 0, ev_raise
+    should cross zero at this fold threshold"""
+    return bet / (pot+bet)
+
+def mdf(bet, pot):
+    """Checks how often you should continue so someone bluffing doesnt profit.
+    A bot that folds 1-mdf can be bluffed to profit by anyone"""
+
+    return pot / (bet+pot)
+
+def spr(eff_stack, pot):
+    """Checks how many pots are left to bet behind. Effective stack is smaller
+    of you or opponents. So if its a low spr, then closer to someone being all in, more aggresive
+    Higher spr means slower game"""
+
+    return eff_stack / pot
+
