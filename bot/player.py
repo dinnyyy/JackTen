@@ -2,6 +2,7 @@ import random
 
 from bot.combinatorics import parse_cards
 from bot.equity import equity_exact, equity_monte_carlo
+from bot.exp_value import calc_ev
 
 RAISE_EQUITY = 0.70   # raise or bet at or above this equity
 BET_FRACTION = 0.75   # raise size as a fraction of the pot
@@ -55,11 +56,10 @@ class Player:
         equity, ppot, npot = self.read_hand(hero, board)
 
         to_call, pot = msg["to_call"], msg["pot"]
-        if equity >= RAISE_EQUITY - PROTECT * npot and "raise" in legal:
-            target = to_call + int(BET_FRACTION * (pot + to_call))
-            amount = max(msg["min_raise_to"], min(msg["max_raise_to"], target))
-            return {"type": "action_response", "action": "raise", "amount": amount}
-        if to_call == 0:
-            return {"type": "action_response", "action": "check"}
-        needed = to_call / (pot + to_call) * (1 - IMPLIED * ppot + REVERSE * npot)
-        return {"type": "action_response", "action": "call" if equity > needed else "fold"}
+        action, amount = calc_ev(pot, to_call, equity)
+        
+        return {"type": "action_response", "action": action, "amount":amount}
+
+    def equity_to_call(call, pot):
+        return call / (pot+call)
+
