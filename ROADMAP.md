@@ -43,13 +43,13 @@ Engine, simulator and hand-history logging are built. Still to do:
 
 ## Phase 2: Pot odds and single-decision EV
 
-- [ ] Equity needed to call: `call / (pot + call)`
-- [ ] EV of call, bet, raise, with fold probability as a parameter
-- [ ] Break-even bluff frequency
-- [ ] Minimum defence frequency
-- [ ] SPR
-- [ ] Rake adjustment to thresholds
-- [ ] `decide()`: fold / call / raise vs one opponent with one fixed assumption
+- [x] Equity needed to call: `call / (pot + call)`
+- [x] EV of call, bet, raise, with fold probability as a parameter
+- [x] Break-even bluff frequency
+- [x] Minimum defence frequency
+- [x] SPR
+- [x] Rake adjustment to thresholds
+- [x] `decide()`: fold / call / raise vs one opponent with one fixed assumption
 
 **Done when:** hand-checked spots give the right action, and it beats always-call over 10k hands.
 

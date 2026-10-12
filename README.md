@@ -68,15 +68,17 @@ Head-to-head (3000 matches, 100,000 stacks, 50/100 blinds): v2 is statistically 
 
 ## Status
 
-Early. The engine and harness are built; the bot is not.
+Early. The engine, harness and a Phase 1–2 bot are built; opponent modelling is not.
 
 | Component | State |
 |---|---|
 | Engine protocol spec | Documented — [`poker_bot_messages.md`](poker_bot_messages.md) |
 | Local engine, web app (play / watch / simulate), CSV export | Built — `engine/`, `ui/`, `play.py`, `simulate.py` |
-| Foundation — bot-side protocol I/O | Not started (template: `bots/random_bot.py`) |
+| Foundation — bot-side protocol I/O | Done — `bot/main.py` |
 | Phase 0 — combinatorics | Done — `bot/combinatorics.py` |
-| Phases 1–5 — equity, pot odds and EV, multiway, ranges, sizing | Not started |
+| Phase 1 — equity and hand potential | Done — `bot/equity.py` |
+| Phase 2 — pot odds and single-decision EV | Done — `bot/exp_value.py`; beats always-call by about +580 bb/100 (3 vs 3, 22k hands) |
+| Phases 3–5 — multiway, ranges, sizing | Not started |
 | Phase 6 — opponent statistics (Beta-Binomial) | Not started |
 | Phase 7 — exploitation | Not started |
 | Phase 8 — evaluation statistics | Partly built (bb/100 and CI in `engine/stats.py`) |
