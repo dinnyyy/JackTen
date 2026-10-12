@@ -27,6 +27,7 @@ const COLS = [
 let current = null;        // summary being shown
 let colorOf = {};
 let statusTimer = null;
+let lastLive = null;      // matches_played of the live snapshot last drawn
 
 // ---------------- data ----------------
 
@@ -44,6 +45,7 @@ async function loadRuns(activeId) {
 async function showRun(id) {
   const s = await api("/api/sim/run/" + encodeURIComponent(id));
   if (s.error) { $("result").innerHTML = `<div class="empty-state">Run not found.</div>`; return; }
+  lastLive = null;
   renderResult(s);
   loadRuns(id);
 }
@@ -54,6 +56,10 @@ async function pollStatus() {
   try { st = await api("/api/sim/status"); } catch { return; }
   if (st.running) {
     renderProgress(st);
+    if (st.live && st.live.n !== lastLive && !/run=/.test(location.hash)) {
+      lastLive = st.live.n;
+      renderResult(st.live);
+    }
     statusTimer = setTimeout(pollStatus, 500);
     return;
   }
@@ -100,7 +106,7 @@ function renderResult(s) {
   $("result").innerHTML = `
     <header class="run-head">
       <div>
-        <h1>Run ${esc(s.id)} ${s.status === "cancelled" ? '<span class="badge warn">cancelled</span>' : ""}</h1>
+        <h1>Run ${esc(s.id)} ${s.status === "cancelled" ? '<span class="badge warn">cancelled</span>' : s.status === "running" ? '<span class="badge">live</span>' : ""}</h1>
         <p class="hint">${esc(s.created || "")} · seed ${esc(p.seed)} · ${fmt(p.stack)} stacks · blinds ${blinds} · up to ${fmt(p.hands)} hands per match</p>
         <div class="lineup">${p.bots.map((b) => `<span class="chip-tag">${esc(b)}</span>`).join("")}</div>
       </div>
@@ -147,6 +153,7 @@ const tone = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "");
 const signed = (n) => (n > 0 ? "+" : "") + fmt(n);
 
 function renderDownloads(s) {
+  if (s.status === "running") { $("downloads").innerHTML = ""; return; }
   const files = s.files || [];
   const size = (b) => b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : b > 1e3 ? `${Math.round(b / 1e3)} KB` : `${b} B`;
   $("downloads").innerHTML = `<h2 class="first">Download</h2>

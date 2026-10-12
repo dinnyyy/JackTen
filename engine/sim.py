@@ -123,7 +123,11 @@ def cumulative_series(results: list[dict], labels: list[str]) -> dict:
     return {"x": xs, "lines": lines}
 
 
-def run_simulation(params: dict, on_progress=None, cancel=None) -> dict:
+LIVE_MIN_S = 2.0   # minimum gap between live snapshots; also kept >= 5x the last snapshot's cost
+
+
+def run_simulation(params: dict, on_progress=None, cancel=None, on_snapshot=None) -> dict:
+    """on_snapshot(partial_summary) is called every few seconds with the stats and chart series so far."""
     p = {**DEFAULTS, **{k: v for k, v in params.items() if v is not None}}
     lineup = parse_lineup(p["bots"])
     if not 2 <= len(lineup) <= 10:
@@ -157,6 +161,7 @@ def run_simulation(params: dict, on_progress=None, cancel=None) -> dict:
     stats, results = {}, []
     hands = 0
     cancelled = False
+    next_snap = t0 + LIVE_MIN_S
     pool = ProcessPoolExecutor(max_workers=p["workers"])
     try:
         pending = {pool.submit(run_one, j) for j in jobs}
@@ -172,6 +177,12 @@ def run_simulation(params: dict, on_progress=None, cancel=None) -> dict:
                 hands += res["hands"]
             if done and on_progress:
                 on_progress(len(results), len(jobs), hands, time.time() - t0)
+            if done and on_snapshot and time.time() >= next_snap:
+                t1 = time.time()
+                on_snapshot({"matches_played": len(results), "total_hands": hands,
+                             "elapsed_s": round(t1 - t0, 2), "bots": summarise(stats),
+                             "series": cumulative_series(results, labels)})
+                next_snap = time.time() + max(LIVE_MIN_S, 5 * (time.time() - t1))
     finally:
         # wait even when cancelling: running matches finish (≤ one match each) and
         # their worker processes exit, which closes their CSV part files

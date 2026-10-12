@@ -41,6 +41,7 @@ class SimJob:
         self.progress = {"done": 0, "total": params.get("matches", SIM_DEFAULTS["matches"]),
                          "hands": 0, "elapsed": 0.0}
         self.started = time.time()
+        self.live: dict | None = None
         self.result: dict | None = None
         self.error: str | None = None
         self.thread = threading.Thread(target=self._run, daemon=True)
@@ -49,8 +50,11 @@ class SimJob:
     def _run(self):
         def prog(done, total, hands, elapsed):
             self.progress = {"done": done, "total": total, "hands": hands, "elapsed": round(elapsed, 1)}
+        def snap(partial):
+            self.live = {**partial, "n": partial["matches_played"], "id": "live", "status": "running",
+                         "params": self.params, "files": [], "dir": ""}
         try:
-            self.result = run_simulation(self.params, on_progress=prog, cancel=self.cancel)
+            self.result = run_simulation(self.params, on_progress=prog, cancel=self.cancel, on_snapshot=snap)
         except Exception as e:
             self.error = f"{type(e).__name__}: {e}"
 
@@ -61,7 +65,7 @@ class SimJob:
     def status(self):
         return {"running": self.running, "progress": self.progress,
                 "elapsed": round(time.time() - self.started, 1), "params": self.params,
-                "result": self.result, "error": self.error, "cancelling": self.cancel.is_set()}
+                "live": None if self.result else self.live, "result": self.result, "error": self.error, "cancelling": self.cancel.is_set()}
 
 
 class App:
