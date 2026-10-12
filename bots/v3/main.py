@@ -1,13 +1,13 @@
 """Bot entry point: reads engine messages on stdin, answers action_requests on stdout.
 
-Run from the repo root:  python -m bot_v3.main
+Run from the repo root:  python -m bots.v3.main
 Policy lives in bot/player.py (equity and hand potential vs pot odds).
 """
 
 import json
 import sys
 
-from bot_v3.player import Player
+from bots.v3.player import Player
 
 
 def safe_action(state: dict) -> dict:

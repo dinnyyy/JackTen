@@ -1,7 +1,7 @@
 import random
 
-from bot_v1.combinatorics import parse_cards
-from bot_v1.equity import estimate_equity
+from bots.v1.combinatorics import parse_cards
+from bots.v1.equity import estimate_equity
 
 RAISE_EQUITY = 0.70   # raise or bet at or above this equity
 BET_FRACTION = 0.75   # raise size as a fraction of the pot

@@ -1,4 +1,4 @@
-from bot_v3.combinatorics import remaining_deck, live_combos, parse_cards
+from bots.v2.combinatorics import remaining_deck, live_combos, parse_cards
 from engine.evaluator import evaluate
 from itertools import combinations
 import random
