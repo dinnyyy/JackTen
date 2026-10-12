@@ -1,7 +1,7 @@
 """Bot entry point: reads engine messages on stdin, answers action_requests on stdout.
 
 Run from the repo root:  python -m bot_v1.main
-Policy lives in bot/player.py (equity vs pot odds).
+Policy lives in bot/player.py (equity and hand potential vs pot odds).
 """
 
 import json
