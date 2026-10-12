@@ -4,11 +4,6 @@ from bot.combinatorics import parse_cards
 from bot.equity import equity_exact, equity_monte_carlo
 from bot.exp_value import calc_ev
 
-RAISE_EQUITY = 0.70   # raise or bet at or above this equity
-BET_FRACTION = 0.75   # raise size as a fraction of the pot
-IMPLIED = 0.30        # call price is cut by IMPLIED * ppot: a draw that hits wins more later
-REVERSE = 0.30        # call price is raised by REVERSE * npot: a hand that gets outdrawn loses more later
-PROTECT = 0.10        # raise threshold is cut by PROTECT * npot: charge the draws while ahead
 TARGET_SE = 0.01      # stop sampling once equity's standard error is this small
 N_MAX = 10000         # cap on samples per decision
 
@@ -55,11 +50,8 @@ class Player:
         board = parse_cards(" ".join(msg["board"]))
         equity, ppot, npot = self.read_hand(hero, board)
 
-        to_call, pot = msg["to_call"], msg["pot"]
-        action, amount = calc_ev(pot, to_call, equity)
-        
-        return {"type": "action_response", "action": action, "amount":amount}
-
-    def equity_to_call(call, pot):
-        return call / (pot+call)
-
+        action, raise_to = calc_ev(msg["pot"], msg["to_call"], equity, legal, msg.get("min_raise_to"), msg.get("max_raise_to"))
+        resp = {"type": "action_response", "action": action}
+        if raise_to is not None:
+            resp["amount"] = raise_to
+        return resp
