@@ -1,26 +1,27 @@
-from bot.combinatorics import remaining_deck, live_combos, parse_cards
+from bot.combinatorics import remaining_deck, live_combos, filter_range, parse_cards
 from engine.evaluator import evaluate
 from itertools import combinations
 import random
 import math
 
 def showdown(hero_score, opps, board):
-    """Score one opponent hand against the hero on a full 5-card board: 1 win, 0.5 tie, 0 loss.
+    """Score the hero against every opponent hand on a full 5-card board: 1 win, 0 loss, and a tie
+    with k opponents splits the pot 1/(k+1).
 
-    hero_score is evaluate(hero + board), computed once by the caller and reused.
+    opps is a list of hole-card pairs. hero_score is evaluate(hero + board), computed once by the caller and reused.
     """
-    opp_scores = []
-    for opp in opps:
-        opp_scores.append(evaluate(list(opp) + board))
-    if hero_score >max(opp_scores):
+    best = max(evaluate(list(opp) + board) for opp in opps)
+    if hero_score > best:
         return 1
-    elif hero_score==max(opp_scores):
-        return 1/(len(opps)+1)
+    if hero_score == best:
+        tied = sum(1 for opp in opps if evaluate(list(opp) + board) == hero_score)
+        return 1 / (tied + 1)
     return 0
 
 
 def equity_exact(hero, board):
-    """Exact equity vs one random hand: enumerate every opponent hand and every runout.
+    """Exact equity vs one random hand: enumerate every opponent hand and every runout. Heads-up only; multiway
+    enumeration is too large, use equity_monte_carlo.
 
     hero and board are lists of card ints. Cheap on the river (about 1k evaluations), about 45k on the turn and 1M on the
     flop, so use Monte Carlo before the river at the table.
@@ -33,22 +34,59 @@ def equity_exact(hero, board):
         deck = remaining_deck(hero, board, opp)
         if num_remaining==0:
             hero_score = evaluate(hero+board)
-            score +=showdown(hero_score, opp, board)
+            score +=showdown(hero_score, [opp], board)
             i +=1
         else:
             for runout in combinations(deck, num_remaining):
                 hero_score = evaluate(hero+board+list(runout))
-                score +=showdown(hero_score, opp, board + list(runout))
+                score +=showdown(hero_score, [opp], board + list(runout))
                 i +=1
 
     return score/i
 
-def equity_monte_carlo(hero, board, n, rng=None, players_left=1, potential=False, target_se=None, batch=200):
-    """Monte Carlo equity vs one random hand. Returns (equity, standard_error).
+def _opponent_pools(hero, board, opponents, ranges):
+    """One (hands, weights) pool per opponent with hero and board cards removed. weights is None for a uniform pool."""
+    if ranges is None:
+        pool = (live_combos(hero, board), None)
+        return [pool] * opponents
+    pools = []
+    for r in ranges:
+        if r is None:
+            pools.append((live_combos(hero, board), None))
+            continue
+        live = filter_range(r, hero, board)
+        if not live:
+            raise ValueError("an opponent range has no live combos")
+        pools.append((list(live), list(live.values())))
+    return pools
+
+
+def _deal_opponents(pools, rng):
+    """Draw one hand per pool with no shared cards. Independent draws rejected on overlap give the exact joint
+    distribution conditioned on the hands being disjoint."""
+    for _ in range(1000):
+        opps, used = [], set()
+        for hands, weights in pools:
+            opp = rng.choice(hands) if weights is None else rng.choices(hands, weights)[0]
+            if opp[0] in used or opp[1] in used:
+                break
+            used.update(opp)
+            opps.append(opp)
+        else:
+            return opps
+    raise ValueError("could not deal disjoint opponent hands from these ranges")
+
+
+def equity_monte_carlo(hero, board, n, rng=None, players_left=1, potential=False, target_se=None, batch=200, ranges=None):
+    """Monte Carlo equity vs players_left opponents. Returns (equity, standard_error).
+
+    players_left is the number of opponents still in the hand (not counting the hero). Each holds a random hand,
+    unless ranges is given: a list with one entry per opponent, each a {combo: weight} dict (or None for a random
+    hand). Then len(ranges) sets the opponent count. Ties split the pot, so equity is the expected pot share.
 
     With potential=True, the same simulation also tallies hand potential and returns
     (equity, standard_error, ppot, npot). ppot: chance of finishing ahead given behind now. npot: chance of finishing
-    behind given ahead now. Ties count half (Billings). Needs a flop or turn board; a potential is None if no
+    behind given ahead now. Ties count as a split (Billings). Needs a flop or turn board; a potential is None if no
     sample started in the state it conditions on.
 
     With target_se, n is a cap: after every `batch` samples it stops once the standard error is at or below the target.
@@ -57,13 +95,16 @@ def equity_monte_carlo(hero, board, n, rng=None, players_left=1, potential=False
     """
     if n < 1:
         raise ValueError("n must be at least 1")
+    opponents = len(ranges) if ranges is not None else players_left
+    if opponents < 1:
+        raise ValueError("need at least one opponent")
     if potential and len(board) not in (3, 4):
         raise ValueError("potential needs a flop or turn board")
     hero, board = list(hero), list(board)
     if rng is None:
         rng = random.Random()
 
-    combos = live_combos(hero, board)
+    pools = _opponent_pools(hero, board, opponents, ranges)
     if potential:
         hero_now = evaluate(hero + board)
         # hp[start][final]: 0 = behind, 1 = tied, 2 = ahead; start on the current board, final at showdown
@@ -71,18 +112,15 @@ def equity_monte_carlo(hero, board, n, rng=None, players_left=1, potential=False
     score = 0
     used = 0
     for _ in range(n):
-        opps = []
-        for _ in range(players_left):
-            combos = live_combos(hero, *opps, board)
-            opps.append(rng.choice(combos)) 
-            deck = remaining_deck(hero, *opps, board)
+        opps = _deal_opponents(pools, rng)
+        deck = remaining_deck(hero, *opps, board)
         full_board = board + rng.sample(deck, 5 - len(board))
         result = showdown(evaluate(hero + full_board), opps, full_board)
         score += result
         if potential:
-            opp_now = evaluate(list(*opps) + board)
+            opp_now = max(evaluate(list(opp) + board) for opp in opps)
             start = 2 if hero_now > opp_now else 1 if hero_now == opp_now else 0
-            hp[start][int(result * 2)] += 1
+            hp[start][2 if result == 1 else 0 if result == 0 else 1] += 1
         used += 1
         if target_se is not None and used % batch == 0:
             p = (score + 1) / (used + 2)

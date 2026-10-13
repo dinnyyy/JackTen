@@ -12,10 +12,13 @@ class Player:
     def __init__(self, stack: int = 0):
         self.rng = random.Random()
         self.hand = []
+        self.seat = None
+        self.num_players = 2
+        self.players_left = 1
 
     def new_hand(self, hand):
         self.hand = hand
-        self.players_left = self.num_players -1
+        self.players_left = self.num_players - 1
 
     def start_match(self, msg):
         self.seat = msg["your_seat"]
@@ -29,27 +32,27 @@ class Player:
         self.other_bots = msg["bot_names"]
 
     def read_hand(self, hero, board):
-        """(equity, ppot, npot) vs one random hand, from a single simulation.
+        """(equity, ppot, npot) vs players_left random hands, from a single simulation.
 
         Potential only exists with cards to come, so it is 0 preflop and on the river.
         """
+        if len(board) == 5 and self.players_left == 1:
+            return equity_exact(hero, board), 0.0, 0.0
         if len(board) == 5:
-
-            return equity_exact(hero, board, self.players_left), 0.0, 0.0
+            return equity_monte_carlo(hero, board, N_MAX, self.rng, self.players_left, target_se=TARGET_SE)[0], 0.0, 0.0
         if len(board) == 0:
             return equity_monte_carlo(hero, board, N_MAX, self.rng, self.players_left, target_se=TARGET_SE)[0], 0.0, 0.0
         equity, _, ppot, npot = equity_monte_carlo(hero, board, N_MAX, self.rng, self.players_left, potential=True, target_se=TARGET_SE)
         return equity, ppot or 0.0, npot or 0.0
 
     def decide(self, msg) -> dict:
-        """Phase 2 policy: pick fold / check / call / raise by EV, from equity vs one random hand.
+        """Phase 2 policy: pick fold / check / call / raise by EV, from equity vs the opponents still in the hand.
 
         Raise sizes and the fold probability come from exp_value.calc_ev. ppot and npot are computed but not used yet.
         """
-        moves = msg["action_history"]
-        for move in moves:
-            if move["action"] == "fold":
-                self.players_left -=1
+        # action_history is cumulative for the hand, so recount the folders each time
+        folded = {m["seat"] for m in msg.get("action_history", []) if m["action"] == "fold"}
+        self.players_left = max(1, self.num_players - 1 - len(folded - {self.seat}))
 
         legal = msg["legal_actions"]
         hero = parse_cards(" ".join(self.hand))
