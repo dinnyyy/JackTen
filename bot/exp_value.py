@@ -58,14 +58,17 @@ def ev_raise(pot, to_call, equity, r, opponents=1, rake=0.0):
     """EV of calling and then putting `r` more chips in. If the opponent calls, they match `r`.
 
     The raise only wins uncontested if all `opponents` fold, each at fold_prob, so f = fold_prob ** opponents.
-    Any one caller still comes from the top of their own range, so equity when called filters by the per-opponent
-    fold chance, not the combined one.
+    Callers come from the top of their own ranges, so equity when called filters by the per-opponent fold chance,
+    and winning against k callers at once multiplies those chances. Each caller adds r to the pot we win.
     """
     f_each = fold_prob(pot, r)
     f = f_each ** opponents
-    e = equity_when_called(equity, f_each)
-    k = opponents*(1-f_each)/(1-f)
-    return f * pot * (1 - rake) + (1 - f) * (e * (pot + r*k) * (1 - rake) - (1 - e) * (to_call + r))
+    k = opponents * (1 - f_each) / (1 - f)   # expected callers given at least one calls
+    # equity vs n random hands is about strength ** n, so strength is the per-opponent percentile; to win a called
+    # pot we must beat all k callers, each drawn from the top (1 - f_each) of a range
+    strength = equity ** (1 / opponents)
+    e = equity_when_called(strength, f_each) ** k
+    return f * pot * (1 - rake) + (1 - f) * (e * (pot + r * k) * (1 - rake) - (1 - e) * (to_call + r))
 
 
 def calc_ev(pot, to_call, equity, legal, min_raise_to, max_raise_to, num_opponents=1, fractions=BET_FRACTIONS, rake=0.0):

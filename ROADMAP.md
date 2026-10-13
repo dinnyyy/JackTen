@@ -59,8 +59,8 @@ Engine, simulator and hand-history logging are built. Still to do:
 
 - [x] N-way equity vs several ranges at once
 - [x] Equity realisation discount (position, multiway)
-- [ ] Bluff fold requirement across all live opponents
-- [ ] Thinner value thresholds multiway
+- [x] Bluff fold requirement across all live opponents
+- [x] Tighter value thresholds multiway
 
 **Done when:** Phase 2 decisions stay sensible from 2 to 6 players.
 

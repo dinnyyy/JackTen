@@ -94,9 +94,19 @@ class TestMultiwayBluff(unittest.TestCase):
         # pot-sized bet, 3 opponents: each folds 1/2, all fold 1/8; a caller is still the top half of a range
         pot, r, eq = 100, 100, 0.6
         f = 0.5 ** 3
-        e = equity_when_called(eq, 0.5)
-        want = f * pot + (1 - f) * (e * (pot + r) - (1 - e) * r)
+        k = 3 * 0.5 / (1 - f)
+        e = equity_when_called(eq ** (1 / 3), 0.5) ** k
+        want = f * pot + (1 - f) * (e * (pot + r * k) - (1 - e) * r)
         self.assertAlmostEqual(ev_raise(pot, 0, eq, r, opponents=3), want)
+
+    def test_raise_threshold_rises_but_not_past_fair_share_scaling(self):
+        def first_raise(n):
+            return next(e / 100 for e in range(1, 100)
+                        if calc_ev(100, 0, e / 100, ["check", "raise"], 100, 5000, n)[0] == "raise")
+        t = [first_raise(n) for n in (1, 2, 3, 4)]
+        self.assertEqual(t, sorted(t, reverse=True))   # more opponents -> lower equity needed vs a random hand ...
+        self.assertLess(t[3], 0.5)                     # ... since equity itself shrinks as the field grows
+        self.assertGreater(t[3], 1 / 5)                # but still above a fair share
 
     def test_nuts_still_raises_multiway(self):
         action, _ = calc_ev(100, 0, 0.95, ["check", "raise"], 100, 5000, 4)
