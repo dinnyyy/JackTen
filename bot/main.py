@@ -34,7 +34,7 @@ def main():
         if msg["type"] == "action_request":
             print(json.dumps(decide(player, msg)), flush=True)
         elif msg["type"] == "hand_start":
-            player.new_hand(msg["your_hole_cards"])
+            player.new_hand(msg["your_hole_cards"], msg)
         elif msg["type"] == "match_start":
             player.start_match(msg)
         elif msg["type"] == "match_end":

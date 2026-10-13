@@ -134,12 +134,14 @@ class TestMultiway(unittest.TestCase):
 
     def test_fold_count_uses_cumulative_history(self):
         p = Player()
-        p.num_players, p.seat = 4, 0
+        p.num_players, p.seat = 6, 0   # two seats busted: only 4 dealt in
         p.rng = random.Random(1)
+        p.new_hand(["As", "Ah"], {"stacks": {"0": 1, "1": 1, "2": 1, "3": 1}, "button_seat": 3})
+        self.assertEqual(p.players_left, 3)
+        self.assertEqual(p.position, 0.0)   # first to act left of the button
         hist = [{"seat": 2, "action": "fold"}, {"seat": 3, "action": "raise"}]
         req = {"board": [], "pot": 300, "to_call": 100, "min_raise_to": 200, "max_raise_to": 5000,
                "legal_actions": ["fold", "call", "raise"], "action_history": hist}
-        p.hand = ["As", "Ah"]
         p.decide(req)
         p.decide(req)
         self.assertEqual(p.players_left, 2)

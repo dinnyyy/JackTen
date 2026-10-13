@@ -1,6 +1,6 @@
 import unittest
 
-from bot.exp_value import bbf, calc_ev, equity_to_call, equity_when_called, ev_call, ev_raise, mdf, spr
+from bot.exp_value import bbf, calc_ev, equity_to_call, equity_when_called, ev_call, ev_raise, mdf, position, realisation, spr
 
 
 class TestExpValue(unittest.TestCase):
@@ -74,6 +74,32 @@ class TestExpValue(unittest.TestCase):
     def test_spr_zero_pot(self):
         self.assertEqual(spr(1000, 0), float("inf"))
 
+
+
+class TestRealisation(unittest.TestCase):
+    def test_position_six_handed(self):
+        # button on 3: order is 4, 5, 0, 1, 2, 3
+        self.assertEqual(position(4, 3, range(6)), 0.0)
+        self.assertEqual(position(3, 3, range(6)), 1.0)
+        self.assertAlmostEqual(position(1, 3, range(6)), 0.6)
+
+    def test_position_skips_busted_seats_and_heads_up(self):
+        self.assertEqual(position(5, 0, [0, 2, 5]), 0.5)
+        self.assertEqual(position(0, 0, [0, 2]), 1.0)
+        self.assertEqual(position(2, 0, [0, 2]), 0.0)
+
+    def test_realisation_directions(self):
+        base = realisation(1.0, 1, 0.0, 0.0)
+        self.assertEqual(base, 1.0)
+        self.assertLess(realisation(0.0, 1, 0, 0), base)
+        self.assertLess(realisation(1.0, 3, 0, 0), base)
+        self.assertLess(realisation(1.0, 1, 0, 0.3), base)
+        # a draw only pays for position when out of position
+        self.assertEqual(realisation(1.0, 1, 0.35, 0), 1.0)
+        self.assertLess(realisation(0.0, 1, 0.35, 0), realisation(0.0, 1, 0, 0))
+
+    def test_realisation_clamped(self):
+        self.assertEqual(realisation(0.0, 9, 1.0, 1.0), 0.6)
 
 if __name__ == "__main__":
     unittest.main()

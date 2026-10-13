@@ -2,7 +2,7 @@ import random
 
 from bot.combinatorics import parse_cards
 from bot.equity import equity_exact, equity_monte_carlo
-from bot.exp_value import calc_ev
+from bot.exp_value import calc_ev, position, realisation
 
 TARGET_SE = 0.01      # stop sampling once equity's standard error is this small
 N_MAX = 10000         # cap on samples per decision
@@ -15,10 +15,17 @@ class Player:
         self.seat = None
         self.num_players = 2
         self.players_left = 1
+        self.hand_players = 2
+        self.position = 1.0
 
-    def new_hand(self, hand):
+    def new_hand(self, hand, msg=None):
+        """msg is the hand_start message. Its stacks list the seats dealt in, which shrinks as players bust."""
         self.hand = hand
-        self.players_left = self.num_players - 1
+        active = [int(s) for s in msg["stacks"]] if msg and "stacks" in msg else None
+        self.hand_players = len(active) if active else self.num_players
+        self.players_left = self.hand_players - 1
+        if active and self.seat in active:
+            self.position = position(self.seat, msg["button_seat"], active)
 
     def start_match(self, msg):
         self.seat = msg["your_seat"]
@@ -52,12 +59,13 @@ class Player:
         """
         # action_history is cumulative for the hand, so recount the folders each time
         folded = {m["seat"] for m in msg.get("action_history", []) if m["action"] == "fold"}
-        self.players_left = max(1, self.num_players - 1 - len(folded - {self.seat}))
+        self.players_left = max(1, self.hand_players - 1 - len(folded - {self.seat}))
 
         legal = msg["legal_actions"]
         hero = parse_cards(" ".join(self.hand))
         board = parse_cards(" ".join(msg["board"]))
         equity, ppot, npot = self.read_hand(hero, board)
+        equity = min(1.0, equity * realisation(self.position, self.players_left, ppot, npot))
 
         action, raise_to = calc_ev(msg["pot"], msg["to_call"], equity, legal, msg.get("min_raise_to"), msg.get("max_raise_to"))
         resp = {"type": "action_response", "action": action}
