@@ -15,6 +15,7 @@ class Player:
 
     def new_hand(self, hand):
         self.hand = hand
+        self.players_left = self.num_players -1
 
     def start_match(self, msg):
         self.seat = msg["your_seat"]
@@ -33,10 +34,11 @@ class Player:
         Potential only exists with cards to come, so it is 0 preflop and on the river.
         """
         if len(board) == 5:
-            return equity_exact(hero, board), 0.0, 0.0
+
+            return equity_exact(hero, board, self.players_left), 0.0, 0.0
         if len(board) == 0:
-            return equity_monte_carlo(hero, board, N_MAX, self.rng, target_se=TARGET_SE)[0], 0.0, 0.0
-        equity, _, ppot, npot = equity_monte_carlo(hero, board, N_MAX, self.rng, potential=True, target_se=TARGET_SE)
+            return equity_monte_carlo(hero, board, N_MAX, self.rng, self.players_left, target_se=TARGET_SE)[0], 0.0, 0.0
+        equity, _, ppot, npot = equity_monte_carlo(hero, board, N_MAX, self.rng, self.players_left, potential=True, target_se=TARGET_SE)
         return equity, ppot or 0.0, npot or 0.0
 
     def decide(self, msg) -> dict:
@@ -44,6 +46,11 @@ class Player:
 
         Raise sizes and the fold probability come from exp_value.calc_ev. ppot and npot are computed but not used yet.
         """
+        moves = msg["action_history"]
+        for move in moves:
+            if move["action"] == "fold":
+                self.players_left -=1
+
         legal = msg["legal_actions"]
         hero = parse_cards(" ".join(self.hand))
         board = parse_cards(" ".join(msg["board"]))

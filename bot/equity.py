@@ -4,16 +4,18 @@ from itertools import combinations
 import random
 import math
 
-def showdown(hero_score, opp, board):
+def showdown(hero_score, opps, board):
     """Score one opponent hand against the hero on a full 5-card board: 1 win, 0.5 tie, 0 loss.
 
     hero_score is evaluate(hero + board), computed once by the caller and reused.
     """
-    opp_score = evaluate(list(opp) + board)
-    if hero_score>opp_score:
+    opp_scores = []
+    for opp in opps:
+        opp_scores.append(evaluate(list(opp) + board))
+    if hero_score >max(opp_scores):
         return 1
-    elif hero_score==opp_score:
-        return 0.5
+    elif hero_score==max(opp_scores):
+        return 1/(len(opps)+1)
     return 0
 
 
@@ -41,7 +43,7 @@ def equity_exact(hero, board):
 
     return score/i
 
-def equity_monte_carlo(hero, board, n, rng=None, potential=False, target_se=None, batch=200):
+def equity_monte_carlo(hero, board, n, rng=None, players_left=1, potential=False, target_se=None, batch=200):
     """Monte Carlo equity vs one random hand. Returns (equity, standard_error).
 
     With potential=True, the same simulation also tallies hand potential and returns
@@ -69,13 +71,16 @@ def equity_monte_carlo(hero, board, n, rng=None, potential=False, target_se=None
     score = 0
     used = 0
     for _ in range(n):
-        opp = rng.choice(combos)
-        deck = remaining_deck(hero, opp, board)
+        opps = []
+        for _ in range(players_left):
+            combos = live_combos(hero, *opps, board)
+            opps.append(rng.choice(combos)) 
+            deck = remaining_deck(hero, *opps, board)
         full_board = board + rng.sample(deck, 5 - len(board))
-        result = showdown(evaluate(hero + full_board), opp, full_board)
+        result = showdown(evaluate(hero + full_board), opps, full_board)
         score += result
         if potential:
-            opp_now = evaluate(list(opp) + board)
+            opp_now = evaluate(list(*opps) + board)
             start = 2 if hero_now > opp_now else 1 if hero_now == opp_now else 0
             hp[start][int(result * 2)] += 1
         used += 1
