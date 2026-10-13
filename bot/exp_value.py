@@ -54,18 +54,28 @@ def ev_call(pot, to_call, equity, rake=0.0):
     return equity * pot * (1 - rake) - (1 - equity) * to_call
 
 
-def ev_raise(pot, to_call, equity, r, rake=0.0):
-    """EV of calling and then putting `r` more chips in. If the opponent calls, they match `r`."""
-    f = fold_prob(pot, r)
-    e = equity_when_called(equity, f)
-    return f * pot * (1 - rake) + (1 - f) * (e * (pot + r) * (1 - rake) - (1 - e) * (to_call + r))
+def ev_raise(pot, to_call, equity, r, opponents=1, rake=0.0):
+    """EV of calling and then putting `r` more chips in. If the opponent calls, they match `r`.
+
+    The raise only wins uncontested if all `opponents` fold, each at fold_prob, so f = fold_prob ** opponents.
+    Any one caller still comes from the top of their own range, so equity when called filters by the per-opponent
+    fold chance, not the combined one.
+    """
+    f_each = fold_prob(pot, r)
+    f = f_each ** opponents
+    e = equity_when_called(equity, f_each)
+    k = opponents*(1-f_each)/(1-f)
+    return f * pot * (1 - rake) + (1 - f) * (e * (pot + r*k) * (1 - rake) - (1 - e) * (to_call + r))
 
 
-def calc_ev(pot, to_call, equity, legal, min_raise_to, max_raise_to, fractions=BET_FRACTIONS, rake=0.0):
-    """Best action by EV against one opponent. Returns (action, raise_to); raise_to is None unless raising.
+def calc_ev(pot, to_call, equity, legal, min_raise_to, max_raise_to, num_opponents=1, fractions=BET_FRACTIONS, rake=0.0):
+    """Best action by EV against num_opponents live opponents. Returns (action, raise_to); raise_to is None unless raising.
 
     Assumes none of our chips are in this street yet, so chips added by a raise_to = raise_to.
     When facing a bet we never fold a hand in the top mdf of hands, so the bettor cannot bluff us for free.
+    Multiway this floor is unchanged: the bettor's bluff must make all n defenders fold, so each may fold up to
+    bbf ** (1/n) of hands, but equity vs n random hands is about percentile ** n, so the floor in equity terms
+    is (bbf ** (1/n)) ** n = bbf again. With rake 0 it never binds (pot odds already call at lower equity).
     """
     best, best_ev = ("fold", None), 0.0
     if "check" in legal:
@@ -79,7 +89,7 @@ def calc_ev(pot, to_call, equity, legal, min_raise_to, max_raise_to, fractions=B
     if "raise" in legal:
         for frac in fractions:
             raise_to = max(min_raise_to, min(max_raise_to, to_call + int(frac * (pot + to_call))))
-            ev = ev_raise(pot, to_call, equity, raise_to - to_call, rake)
+            ev = ev_raise(pot, to_call, equity, raise_to - to_call, num_opponents, rake)
             if ev > best_ev:
                 best, best_ev = ("raise", raise_to), ev
     return best
@@ -95,6 +105,9 @@ def position(seat, button, active_seats):
     return order.index(seat) / (len(order) - 1) if len(order) > 1 else 1.0
 
 
+REAL_WEIGHTS = (0.12, 0.03, 0.2, 0.1)   # position, per extra opponent, npot, ppot out of position
+
+
 def realisation(position, opponents, ppot, npot):
     """Fraction of raw equity the hand is expected to realise, in [0.6, 1.0]. Raw equity assumes every hand reaches showdown.
 
@@ -102,5 +115,6 @@ def realisation(position, opponents, ppot, npot):
     equity. A drawing hand (ppot) loses extra only out of position, where it cannot see cards cheaply. Weights
     are hand-tuned starting values. ppot and npot are 0 preflop and on the river.
     """
-    r = 1 - 0.12 * (1 - position) - 0.03 * (opponents - 1) - 0.2 * npot - 0.1 * ppot * (1 - position)
+    w_pos, w_opp, w_npot, w_ppot = REAL_WEIGHTS
+    r = 1 - w_pos * (1 - position) - w_opp * (opponents - 1) - w_npot * npot - w_ppot * ppot * (1 - position)
     return max(0.6, min(1.0, r))

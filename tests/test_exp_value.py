@@ -76,6 +76,33 @@ class TestExpValue(unittest.TestCase):
 
 
 
+class TestMultiwayBluff(unittest.TestCase):
+    def test_one_opponent_matches_old_behaviour(self):
+        self.assertEqual(ev_raise(100, 0, 0.3, 75), ev_raise(100, 0, 0.3, 75, opponents=1))
+
+    def test_everyone_must_fold(self):
+        # pot-sized bet: each folds 1/2 (bbf = 100/200), so three fold together 1/8
+        from bot.exp_value import fold_prob
+        self.assertAlmostEqual(fold_prob(100, 100) ** 3, 1 / 8)
+
+    def test_bluff_profitable_heads_up_not_three_way(self):
+        # pure bluff at exactly bbf breaks even heads-up and loses with more opponents
+        self.assertAlmostEqual(ev_raise(100, 0, 0.0, 100, opponents=1), 0.0)
+        self.assertLess(ev_raise(100, 0, 0.0, 100, opponents=3), 0.0)
+
+    def test_called_equity_uses_per_opponent_fold(self):
+        # pot-sized bet, 3 opponents: each folds 1/2, all fold 1/8; a caller is still the top half of a range
+        pot, r, eq = 100, 100, 0.6
+        f = 0.5 ** 3
+        e = equity_when_called(eq, 0.5)
+        want = f * pot + (1 - f) * (e * (pot + r) - (1 - e) * r)
+        self.assertAlmostEqual(ev_raise(pot, 0, eq, r, opponents=3), want)
+
+    def test_nuts_still_raises_multiway(self):
+        action, _ = calc_ev(100, 0, 0.95, ["check", "raise"], 100, 5000, 4)
+        self.assertEqual(action, "raise")
+
+
 class TestRealisation(unittest.TestCase):
     def test_position_six_handed(self):
         # button on 3: order is 4, 5, 0, 1, 2, 3

@@ -67,7 +67,7 @@ class Player:
         equity, ppot, npot = self.read_hand(hero, board)
         equity = min(1.0, equity * realisation(self.position, self.players_left, ppot, npot))
 
-        action, raise_to = calc_ev(msg["pot"], msg["to_call"], equity, legal, msg.get("min_raise_to"), msg.get("max_raise_to"))
+        action, raise_to = calc_ev(msg["pot"], msg["to_call"], equity, legal, msg.get("min_raise_to"), msg.get("max_raise_to"), self.players_left)
         resp = {"type": "action_response", "action": action}
         if raise_to is not None:
             resp["amount"] = raise_to
