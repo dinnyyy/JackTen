@@ -76,6 +76,7 @@ class Hand:
         self.done = False
         self.result: dict | None = None
         self.sb_seat = self.bb_seat = None
+        self.runout: dict | None = None   # set when the board is run out with cards still to come
 
     # ---------- seat helpers ----------
 
@@ -256,6 +257,11 @@ class Hand:
             if self.street == "river":
                 self._finish(showdown=True)
                 return events
+            if self.runout is None and len(able) < 2 and self.street != "river":
+                self.runout = {"board": list(self.board),
+                               "holes": {s: list(p.hole) for s, p in self.players.items()},
+                               "contrib": {s: p.total for s, p in self.players.items()},
+                               "live": live}
             events.append(self._next_street())
 
     def _next_street(self) -> dict:

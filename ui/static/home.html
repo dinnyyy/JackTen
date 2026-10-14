@@ -71,6 +71,9 @@
             <label>Worker processes <input name="workers" type="number" min="1"></label>
           </div>
           <div class="checks sim-only">
+            <label><input type="checkbox" name="cash" checked> Cash mode <span class="hint">— stacks reset every hand: no bust-outs, independent hands</span></label>
+            <label><input type="checkbox" name="duplicate" checked> Duplicate deals <span class="hint">— replay each deal with bots swapped between seats, so card luck cancels</span></label>
+            <label><input type="checkbox" name="bench"> Benchmark seeds <span class="hint">— frozen seeds for final comparisons (forces both above, ignores Seed). Don't tune on these.</span></label>
             <label><input type="checkbox" name="csv_detail" checked> Detailed CSVs <span class="hint">— every hand, action and pot</span></label>
             <label><input type="checkbox" name="log" checked> NDJSON hand histories <span class="hint">— raw protocol logs</span></label>
           </div>

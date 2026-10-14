@@ -11,6 +11,9 @@ const COLS = [
   ["net_chips", "Net chips", "Total chips won or lost"],
   ["bb_per_100", "bb/100", "Big blinds won per 100 hands (each hand normalised by its own big blind)"],
   ["bb_per_100_ci95", "±95%", "Half-width of the 95% confidence interval on bb/100"],
+  ["bb_per_100_ev", "EV bb/100", "bb/100 with all-in runouts replaced by their expected value: same long-run mean, less luck"],
+  ["ev_ci95", "±95% EV", "Half-width of the 95% confidence interval on EV bb/100"],
+  ["sd_100", "SD/100", "Standard deviation of one 100-hand block's bb/100 (about 100 is normal for 6-max)"],
   ["avg_place", "Avg place", "Average finishing position (1 = won the match)"],
   ["win_rate", "Win %", "Share of matches finished in 1st"],
   ["bust_rate", "Bust %", "Share of matches that ended with zero chips"],
@@ -102,12 +105,14 @@ function renderResult(s) {
   const blinds = `${fmt(p.sb)}/${fmt(p.bb)}${p.ante ? ` ante ${fmt(p.ante)}` : ""}${p.blind_up ? `, doubling every ${p.blind_up}` : ""}`;
   const hps = s.elapsed_s > 0 ? Math.round(s.total_hands / s.elapsed_s) : 0;
   const best = s.bots[0];
+  const howOpen = !!document.querySelector("details.how[open]");   // survive live re-renders
 
   $("result").innerHTML = `
     <header class="run-head">
       <div>
         <h1>Run ${esc(s.id)} ${s.status === "cancelled" ? '<span class="badge warn">cancelled</span>' : s.status === "running" ? '<span class="badge">live</span>' : ""}</h1>
-        <p class="hint">${esc(s.created || "")} · seed ${esc(p.seed)} · ${fmt(p.stack)} stacks · blinds ${blinds} · up to ${fmt(p.hands)} hands per match</p>
+        <p class="hint">${esc(s.created || "")} · seed ${esc(p.seed)} · ${fmt(p.stack)} stacks · blinds ${blinds} · up to ${fmt(p.hands)} hands per match
+          ${p.cash ? '<span class="badge">cash mode</span>' : ""} ${p.duplicate ? '<span class="badge">duplicate deals</span>' : ""} ${p.bench ? '<span class="badge warn">benchmark seeds</span>' : ""}</p>
         <div class="lineup">${p.bots.map((b) => `<span class="chip-tag">${esc(b)}</span>`).join("")}</div>
       </div>
     </header>
@@ -118,6 +123,7 @@ function renderResult(s) {
       <div class="tile"><div class="k">Top bb/100</div><div class="v">${best ? esc(best.bot) : "—"}</div>
         <div class="sub">${best ? `${signed(best.bb_per_100)} ± ${best.bb_per_100_ci95}` : ""}</div></div>
     </div>
+    ${compareHTML(s)}
     <section class="box chart-card">
       <h2>Cumulative winnings</h2>
       <p class="hint">Net big blinds per bot, hand by hand across the whole run.</p>
@@ -135,17 +141,76 @@ function renderResult(s) {
         <thead><tr>${COLS.map(([k, l, h]) => `<th title="${esc(h)}" class="${k === "bot" ? "" : "num"}">${l}</th>`).join("")}</tr></thead>
         <tbody>${s.bots.map((b) => `<tr>${COLS.map(([k]) => k === "bot"
           ? `<td><i class="sw" style="background:${colorOf[b.bot] ?? OTHER}"></i>${esc(b.bot)}</td>`
-          : `<td class="num ${k === "bb_per_100" || k === "net_chips" ? tone(b[k]) : ""}">${cell(k, b[k])}</td>`).join("")}</tr>`).join("")}
+          : `<td class="num ${k === "bb_per_100" || k === "net_chips" || k === "bb_per_100_ev" ? tone(b[k]) : ""}">${cell(k, b[k])}</td>`).join("")}</tr>`).join("")}
         </tbody></table></div>
     </section>`;
+  if (howOpen) document.querySelector("details.how").open = true;
   renderDownloads(s);
   drawLine();
   drawDots();
+  drawCompare();
+}
+
+// ---------------- head-to-head ----------------
+
+function compareHTML(s) {
+  const ev = s.evaluation;
+  if (!ev || !ev.pairs.length) return "";
+  const dup = ev.plays_per_deal > 1;
+  const unit = dup ? "deal-and-block pairs" : "100-hand blocks";
+  const sorted = [...ev.pairs].sort((a, b) => Math.abs(b.diff_ev) - Math.abs(a.diff_ev));
+  const top = sorted[0];
+  const verdict = top.ci95_ev === 0 ? "Not enough data for a confidence interval yet."
+    : top.significant_ev
+      ? `<b>${esc(top.diff_ev > 0 ? top.a : top.b)}</b> is ahead of <b>${esc(top.diff_ev > 0 ? top.b : top.a)}</b> by ${fmt(Math.abs(top.diff_ev))} ± ${fmt(top.ci95_ev)} bb/100: the interval excludes zero, so the gap is real.`
+      : `<b>${esc(top.a)}</b> vs <b>${esc(top.b)}</b>: ${signed(top.diff_ev)} ± ${fmt(top.ci95_ev)} bb/100. The interval includes zero, so this is not proven yet. Keep running.`;
+  const shrink = dup && top.ci95_nodup_ev ? `<p class="hint">Duplicate deals: the same hands without deal pairing would give ± ${fmt(top.ci95_nodup_ev)}; with pairing ± ${fmt(top.ci95_ev)}${top.ci95_ev < top.ci95_nodup_ev ? ` (${Math.round(100 * (1 - top.ci95_ev / top.ci95_nodup_ev))}% tighter)` : " (no gain for this matchup)"}.</p>` : "";
+  return `<section class="box chart-card">
+    <h2>Head-to-head</h2>
+    <p class="verdict">${verdict}</p>
+    <div class="chart" id="cmpChart"></div>
+    ${shrink}
+    <p class="hint small">Difference in bb/100 (all-in luck removed) with 95% interval, from ${fmt(ev.units)} ${unit}${dup ? ", each deal played with the bots swapped between seats" : ""}. Bars that cross zero are not proven.</p>
+    <details class="how"><summary>Why is this a better comparison?</summary>
+      <ul>
+        <li><b>Honest error bars.</b> Hands in a match share stacks, so they are not independent. Intervals come from 100-hand blocks instead of single hands.</li>
+        <li><b>Same cards for both bots.</b> With duplicate deals every deal is played twice with the bots swapped, so a bot cannot win just by being dealt better cards.</li>
+        <li><b>All-in luck removed.</b> When everyone is all-in with cards to come, the result is replaced by the average over every possible runout. Same long-run answer, less noise.</li>
+        <li><b>No bust-outs.</b> Cash mode resets stacks every hand, so hands are independent and every bot plays the same number of hands at the same depth.</li>
+        <li><b>Frozen benchmark.</b> Benchmark seeds are reserved for final checks and logged, so you cannot tune against them unnoticed.</li>
+      </ul></details>
+  </section>`;
+}
+
+function drawCompare() {
+  const el = $("cmpChart");
+  const ev = current && current.evaluation;
+  if (!el || !ev) return;
+  const pairs = [...ev.pairs].sort((a, b) => Math.abs(b.diff_ev) - Math.abs(a.diff_ev)).slice(0, 8);
+  const dup = ev.plays_per_deal > 1;
+  const W = el.clientWidth, row = 40, m = { l: 150, r: 130, t: 8, b: 28 };
+  const Hh = m.t + m.b + row * pairs.length, iw = W - m.l - m.r;
+  const ext = pairs.flatMap((p) => [p.diff_ev - Math.max(p.ci95_ev, p.ci95_nodup_ev || 0), p.diff_ev + Math.max(p.ci95_ev, p.ci95_nodup_ev || 0)]);
+  const xt = niceTicks(Math.min(0, ...ext), Math.max(0, ...ext), 6);
+  const x0 = xt[0], x1 = xt[xt.length - 1];
+  const sx = (v) => m.l + ((v - x0) / (x1 - x0)) * iw;
+  let svg = `<svg width="${W}" height="${Hh}" role="img" aria-label="bb/100 difference between bots with 95% intervals">`;
+  for (const v of xt) svg += `<line class="${v === 0 ? "zero" : "grid"}" x1="${sx(v)}" x2="${sx(v)}" y1="${m.t}" y2="${Hh - m.b}"/>
+    <text class="tick" x="${sx(v)}" y="${Hh - 8}" text-anchor="middle">${compact(v)}</text>`;
+  pairs.forEach((p, i) => {
+    const cy = m.t + row * i + row / 2, c = p.significant_ev ? (colorOf[p.diff_ev > 0 ? p.a : p.b] ?? OTHER) : OTHER;
+    if (dup && p.ci95_nodup_ev) svg += `<line class="whisker" style="opacity:.3" x1="${sx(p.diff_ev - p.ci95_nodup_ev)}" x2="${sx(p.diff_ev + p.ci95_nodup_ev)}" y1="${cy + 9}" y2="${cy + 9}" stroke="${OTHER}"><title>Same hands without deal pairing</title></line>`;
+    svg += `<text class="row-label" x="${m.l - 12}" y="${cy + 4}" text-anchor="end">${esc(p.a)} − ${esc(p.b)}</text>
+      <line class="whisker" x1="${sx(p.diff_ev - p.ci95_ev)}" x2="${sx(p.diff_ev + p.ci95_ev)}" y1="${cy - 3}" y2="${cy - 3}" stroke="${c}"/>
+      <circle class="dot" cx="${sx(p.diff_ev)}" cy="${cy - 3}" r="5.5" fill="${c}"/>
+      <text class="row-value" x="${m.l + iw + 12}" y="${cy + 1}">${signed(p.diff_ev)} ± ${fmt(p.ci95_ev)}</text>`;
+  });
+  el.innerHTML = svg + "</svg>" + (dup ? `<p class="hint small">Faint line under each bar: the interval the same hands would give without deal pairing.</p>` : "");
 }
 
 function cell(k, v) {
   if (v === null || v === undefined) return "—";
-  if (k === "bb_per_100" || k === "net_chips") return signed(v);
+  if (k === "bb_per_100" || k === "net_chips" || k === "bb_per_100_ev") return signed(v);
   if (["win_rate", "bust_rate", "vpip", "pfr", "threebet", "wtsd", "wsd"].includes(k)) return `${v}%`;
   return typeof v === "number" ? fmt(v) : esc(v);
 }
@@ -296,7 +361,7 @@ function drawDots() {
 }
 
 let resizeT;
-addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { drawLine(); drawDots(); }, 120); });
+addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { drawLine(); drawDots(); drawCompare(); }, 120); });
 
 // ---------------- routing ----------------
 

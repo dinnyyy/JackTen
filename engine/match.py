@@ -6,9 +6,15 @@ the same broadcasts plus every player's hole cards in `hand_start`.
 
 Table conventions:
 - Moving button: the button advances to the next seat that still has chips.
+- reset_stacks (cash mode): stacks go back to the starting stack after every hand, so
+  hands are independent and bb/100 is measured at a constant depth. Placements are
+  meaningless in this mode.
 - Players who bust on the same hand are ranked by their stack at the start of
   that hand (bigger stack finishes higher).
 - Invalid, missing or late responses default to check if free, else fold.
+- Deals are seeded per hand number (`seed`, hand index), so two matches with the
+  same seed see the same cards on the same hand number whatever the bots do
+  (duplicate deals). Only the opening button draw uses the match-level rng.
 - All-in convention: send `raise` with `amount == max_raise_to`. The engine also
   accepts `"action": "allin"`, and an over-sized raise is clamped to all-in.
 """
@@ -18,6 +24,7 @@ import threading
 import time
 from dataclasses import dataclass, field, asdict
 
+from engine.allin import expected_wins
 from engine.bots import Bot, BotError
 from engine.hand import Hand
 
@@ -39,6 +46,8 @@ class MatchConfig:
     time_bank_ms: int = 30000
     enforce_time: bool = True
     seed: int | None = None
+    reset_stacks: bool = False   # cash-game mode: every hand starts from starting_stack, nobody busts
+    allin_ev: bool = False   # emit an observer-only `allin_ev` event for all-in runouts
 
     def blinds_for(self, hand_index: int) -> BlindLevel:
         level = self.blind_schedule[0]
@@ -136,8 +145,9 @@ class Match:
         self.button = self._next_button(active)
         start_stacks = {s: self.stacks[s] for s in active}
         with self.lock:
+            deal_rng = self.rng if self.config.seed is None else random.Random(f"{self.config.seed}:{h}")
             hand = Hand(h, start_stacks, self.button, lvl.small_blind, lvl.big_blind,
-                        lvl.ante, self.rng)
+                        lvl.ante, deal_rng)
             self.hand = hand
             events = hand.start()
 
@@ -177,14 +187,21 @@ class Match:
         busted = []
         for s in active:
             self.stacks[s] = hand.players[s].stack
-            if self.stacks[s] == 0:
+            if self.stacks[s] == 0 and not self.config.reset_stacks:
                 busted.append(s)
         # bust together: smaller starting stack is out first
         for s in sorted(busted, key=lambda s: (start_stacks[s], -s)):
             self.bust_order.append(s)
+        if self.config.allin_ev and hand.runout:
+            ev = expected_wins(hand.runout, self.config.seed, h)
+            won = {w["seat"]: w["amount"] for w in hand.result["winners"]}
+            self._observe({"type": "allin_ev", "hand_number": h,
+                           "adjust": {str(s): round(v - won.get(s, 0), 2) for s, v in ev.items()}})
         result = dict(hand.result)
         result["stacks"] = {str(s): self.stacks[s] for s in self.seats}
         self._emit(result, active)
+        if self.config.reset_stacks:
+            self.stacks = {s: self.config.starting_stack for s in self.seats}
 
     def _broadcast(self, events, seats):
         for e in events:

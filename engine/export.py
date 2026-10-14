@@ -9,6 +9,7 @@ The column reference lives in docs/sim_outputs.md and in TABLES below.
 """
 
 import csv
+import io
 import glob
 import os
 
@@ -190,8 +191,24 @@ class CsvExporter:
                       shares="|".join(f"{L[int(s)]}:{v}" for s, v in p["shares"].items()))
 
 
-def combine_parts(parts_dir: str, out_dir: str) -> dict[str, int]:
-    """Concatenate per-match part files into <table>.csv. Returns table -> row count."""
+def _filter_rows(data: bytes, keep: set[int]) -> tuple[bytes, int]:
+    buf, rows = io.StringIO(), 0
+    w = csv.writer(buf)
+    try:
+        for row in csv.reader(io.StringIO(data.decode("utf-8", errors="ignore"), newline="")):
+            if row and row[0].isdigit() and int(row[0]) in keep:
+                w.writerow(row)
+                rows += 1
+    except csv.Error:
+        pass   # truncated trailing record
+    return buf.getvalue().encode(), rows
+
+
+def combine_parts(parts_dir: str, out_dir: str, keep: set[int] | None = None) -> dict[str, int]:
+    """Concatenate per-match part files into <table>.csv. Returns table -> row count.
+
+    With `keep` (a cancelled run), only rows of those match indexes are kept, which also
+    drops the half-written last line a killed worker may leave behind."""
     counts = {}
     for table in TABLES:
         parts = sorted(glob.glob(os.path.join(parts_dir, f"{table}_*.csv")))
@@ -203,8 +220,12 @@ def combine_parts(parts_dir: str, out_dir: str) -> dict[str, int]:
             for p in parts:
                 with open(p, "rb") as f:
                     data = f.read()
+                if keep is not None:
+                    data, rows = _filter_rows(data, keep)
+                    n += rows
+                else:
+                    n += data.count(b"\n")
                 out.write(data)
-                n += data.count(b"\n")
                 try:
                     os.remove(p)
                 except OSError:

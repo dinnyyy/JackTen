@@ -36,7 +36,7 @@ function select(m) {
   editor = new LineupEditor($("lineup"), { min: cfg.min, max: cfg.max, initial, seatOffset: cfg.seatOffset });
   const f = $("form").elements;
   for (const k of FIELDS) if (draft[k] !== undefined && f[k]) f[k].value = draft[k];
-  for (const k of ["csv_detail", "log"]) if (draft[k] !== undefined) f[k].checked = draft[k];
+  for (const k of ["csv_detail", "log", "cash", "duplicate", "bench"]) if (draft[k] !== undefined) f[k].checked = draft[k];
   if (!draft.workers && info) f.workers.value = info.sim_defaults.workers;
   history.replaceState(null, "", "#" + m);
 }
@@ -47,6 +47,9 @@ function formValues() {
   for (const k of FIELDS) if (f[k] && f[k].value !== "") v[k] = Number(f[k].value);
   v.csv_detail = f.csv_detail.checked;
   v.log = f.log.checked;
+  v.cash = f.cash.checked;
+  v.duplicate = f.duplicate.checked;
+  v.bench = f.bench.checked;
   return v;
 }
 

@@ -8,6 +8,15 @@ Examples:
 Each bot is `spec` or `label=spec`; bots sharing a label are pooled in the stats.
 Seats are shuffled every match so no bot keeps a positional edge.
 
+Evaluation (Phase 8):
+    --duplicate   replay every deal with the bots moved between seats (deal luck cancels)
+    --cash        reset every stack after each hand (no bust-outs): hands are independent,
+                  bb/100 is at a constant depth, and duplicate deals cancel the most luck
+    --bench       frozen benchmark seeds for final comparisons (implies --duplicate --cash);
+                  never tune on these
+    The table shows bb/100 with a 95% CI built from 100-hand blocks, the same with
+    all-in runouts replaced by their expected value (EV), and a pairwise comparison.
+
 Writes to data/sims/<timestamp>/:
     summary.json / summary.csv   per-bot stats (bb/100 with 95% CI, VPIP, PFR, ...)
     matches.csv                  per-match final stacks and winner
@@ -20,6 +29,7 @@ import argparse
 import sys
 
 from engine.sim import DEFAULTS, run_simulation
+from engine.evaluation import format_pairs
 from engine.stats import format_table
 
 
@@ -36,6 +46,12 @@ def main():
     ap.add_argument("--blind-up", type=int, default=d["blind_up"], metavar="N",
                     help="double the blinds every N hands (0 = fixed blinds)")
     ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--duplicate", action="store_true",
+                    help="play each deal several times with the bots moved between seats")
+    ap.add_argument("--cash", action="store_true",
+                    help="reset stacks after every hand (independent hands, no bust-outs)")
+    ap.add_argument("--bench", action="store_true",
+                    help="frozen benchmark seeds, implies --duplicate --cash; logged in data/bench_log.jsonl")
     ap.add_argument("--workers", type=int, default=d["workers"])
     ap.add_argument("--time-ms", type=int, default=d["time_ms"], help="per-action time for external bots")
     ap.add_argument("--bank-ms", type=int, default=d["bank_ms"])
@@ -49,8 +65,11 @@ def main():
           f"{args.workers} workers")
     step = max(1, args.matches // 10)
 
+    last = [-1]
+
     def progress(done, total, hands, elapsed):
-        if done % step == 0 or done == total:
+        if done != last[0] and (done % step == 0 or done == total):
+            last[0] = done
             print(f"  {done}/{total} matches  {hands} hands  ({elapsed:.1f}s)", flush=True)
 
     try:
@@ -59,6 +78,9 @@ def main():
         sys.exit(str(e))
     print(f"\n{s['total_hands']} hands in {s['elapsed_s']}s  (seed {s['params']['seed']})\n")
     print(format_table(s["bots"]))
+    pairs = format_pairs(s["evaluation"]) if s.get("evaluation") else ""
+    if pairs:
+        print("\n" + pairs)
     print(f"\nSaved to {s['dir']}")
 
 

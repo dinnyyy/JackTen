@@ -51,8 +51,9 @@ class SimJob:
         def prog(done, total, hands, elapsed):
             self.progress = {"done": done, "total": total, "hands": hands, "elapsed": round(elapsed, 1)}
         def snap(partial):
-            self.live = {**partial, "n": partial["matches_played"], "id": "live", "status": "running",
-                         "params": self.params, "files": [], "dir": ""}
+            self.live = {**partial, "n": partial["total_hands"], "id": "live", "status": "running",
+                         "params": {**{k: v for k, v in SIM_DEFAULTS.items() if k != "out"}, **self.params},
+                         "files": [], "dir": ""}
         try:
             self.result = run_simulation(self.params, on_progress=prog, cancel=self.cancel, on_snapshot=snap)
         except Exception as e:
@@ -92,8 +93,13 @@ class App:
         if self.sim and self.sim.running:
             raise RuntimeError("a simulation is already running")
         keys = ("bots", "matches", "hands", "stack", "sb", "bb", "ante", "blind_up", "seed",
-                "log", "csv_detail", "workers")
+                "log", "csv_detail", "workers", "cash", "duplicate", "bench")
         params = {k: body[k] for k in keys if k in body and body[k] not in ("", None)}
+        for k in ("cash", "duplicate", "bench"):
+            if k in params:
+                params[k] = bool(params[k])
+        if params.get("bench"):
+            params.pop("seed", None)
         for k in ("matches", "hands", "stack", "sb", "bb", "ante", "blind_up", "seed", "workers"):
             if k in params:
                 params[k] = int(params[k])

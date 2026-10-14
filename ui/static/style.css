@@ -410,3 +410,8 @@ table.stats tbody tr:hover { background: rgba(255,255,255,.02); }
   .tiles { grid-template-columns: 1fr 1fr; }
   .nav { display: none; }
 }
+
+.verdict { margin: 0 0 12px; font-size: 15px; line-height: 1.45; }
+details.how { margin-top: 10px; font-size: 13px; color: var(--muted); }
+details.how summary { cursor: pointer; color: var(--text, inherit); font-weight: 600; }
+details.how ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.5; }

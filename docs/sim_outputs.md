@@ -12,6 +12,7 @@ Conventions:
 | File | One row per | Written when |
 |---|---|---|
 | `bot_summary.csv` | bot | always |
+| `comparisons.csv` | pair of bots | always (empty with one bot) |
 | `matches.csv` | seat per match | always |
 | `cumulative_winnings.csv` | sampled point in the run | always |
 | `errors.csv` | bot error | always (may be empty) |
@@ -29,7 +30,10 @@ Conventions:
 | `matches` | Seats this bot occupied across all matches. |
 | `net_chips` | Total chips won or lost. |
 | `bb_per_100` | Big blinds won per 100 hands. |
-| `bb_per_100_ci95` | Half-width of the 95% confidence interval on `bb_per_100`. It treats hands as independent, so read it as a guide, not gospel. |
+| `bb_per_100_ci95` | Half-width of the 95% confidence interval on `bb_per_100`, built from 100-hand blocks (see Evaluation below). |
+| `bb_per_100_ev` | `bb_per_100` with every all-in runout replaced by its expected value. Same long-run mean, less noise. |
+| `ev_ci95` | 95% half-width on `bb_per_100_ev`. |
+| `sd_100` | Standard deviation of one full 100-hand block's bb/100. Expect roughly 100 for a 6-max bot at constant depth. |
 | `avg_place` | Mean finishing position. 1 = won the match. |
 | `win_rate` | % of matches finished 1st. |
 | `bust_rate` | % of matches that ended with zero chips. |
@@ -114,3 +118,25 @@ One row per decision. It captures exactly what the bot saw and did, which makes 
 ## errors.csv
 
 `match`, `hand`, `seat`, `bot`, `error`.
+
+## Evaluation (Phase 8)
+
+How to read `bb_per_100` and compare bots.
+
+- **Blocks.** A block is 100 consecutive hands of one match. The CI is `1.96 x SD(block bb/100) / sqrt(blocks)`. Blocks cut short by a bust-out count in proportion to their length (ratio estimator).
+- **All-in EV.** When every bet is called and cards are still to come, the engine averages each player's winnings over all runouts (exact for one or two cards to come, 1,000 samples preflop) and replaces the actual result with that. `*_ev` columns use it. The actual-minus-expected luck has mean zero, so nothing is biased.
+- **`--cash`.** Stacks reset to the starting stack after every hand. Hands are independent, nobody busts, and bb/100 is at a constant depth. Placement, win and bust columns mean nothing in this mode. Without it, a match ends when one player has everything, matches run short, and bots that bust more play fewer hands.
+- **`--duplicate`.** Each deal seed is played several times with the bots moved between seats: two labels with equal seat counts swap (2 plays); anything else rotates one seat per play. Cards are seeded per (seed, hand number), so every play sees the same hole cards by seat. The CI unit becomes the (deal, block) pair with the plays pooled. `matches` is rounded up to a whole number of deals.
+- **`--bench`.** Frozen seeds from 1,000,000,000, implying `--duplicate --cash`. Ordinary runs refuse that seed range and never draw it. Each benchmark run is appended to `data/bench_log.jsonl`. Tune on dev seeds, then benchmark once.
+
+### comparisons.csv
+
+One row per pair of bots. `diff` is `a` minus `b` in bb/100.
+
+| Column | Meaning |
+|---|---|
+| `a`, `b` | The two bots. |
+| `blocks` | Units the CI is built from (blocks, or (deal, block) pairs with `--duplicate`). |
+| `diff`, `ci95`, `z`, `significant` | Realised difference, its 95% half-width, z score, and whether the difference is outside the CI. |
+| `diff_ev`, `ci95_ev`, `z_ev`, `significant_ev` | The same with all-in runouts replaced by EV. |
+| `ci95_nodup`, `ci95_nodup_ev` | Only with `--duplicate`: the half-width the same hands would have given without deal pairing. Compare with `ci95` to see what duplicating bought. |

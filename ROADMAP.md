@@ -111,14 +111,14 @@ Engine, simulator and hand-history logging are built. Still to do:
 
 ## Phase 8: Evaluation
 
-Build this alongside Phase 1.
+Build this alongside Phase 1. Code in `engine/evaluation.py`, `engine/allin.py`; use `simulate.py --cash --duplicate`.
 
-- [ ] bb/100 with `SE = SD / √(100-hand blocks)`
-- [ ] Verify the SD (about 100 bb/100) on your own bot
-- [ ] 95% CI on every comparison
-- [ ] Duplicate deals and common random numbers
-- [ ] All-in EV control variate
-- [ ] Frozen benchmark seeds, never tune on them
+- [x] bb/100 with `SE = SD / √(100-hand blocks)`
+- [x] Verify the SD (about 100 bb/100) on your own bot
+- [x] 95% CI on every comparison
+- [x] Duplicate deals and common random numbers
+- [x] All-in EV control variate
+- [x] Frozen benchmark seeds, never tune on them
 
 **Done when:** a comparison reports a win rate and CI, and duplicate deals visibly shrink the CI.
 

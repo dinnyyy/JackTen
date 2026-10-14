@@ -84,7 +84,7 @@ Early. The engine, harness and a Phase 1–2 bot are built; opponent modelling i
 | Phases 3–5 — multiway, ranges, sizing | Not started |
 | Phase 6 — opponent statistics (Beta-Binomial) | Not started |
 | Phase 7 — exploitation | Not started |
-| Phase 8 — evaluation statistics | Partly built (bb/100 and CI in `engine/stats.py`) |
+| Phase 8 — evaluation statistics | Built — block CIs, duplicate deals, all-in EV, frozen bench seeds (`engine/evaluation.py`) |
 | Phase 9 — ML policy layer | Not started |
 | Phase 10 — mixture-model opponent typing | Designed, not started |
 | Phase 11 — neural opponent embeddings | Designed, not started |

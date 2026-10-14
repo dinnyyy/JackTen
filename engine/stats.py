@@ -11,9 +11,15 @@ are shuffled. Standard HUD definitions:
 - WTSD   went to showdown, as % of hands where they saw the flop
 - W$SD   won chips at showdown, as % of showdowns
 - bb/100 net big blinds won per 100 hands, each hand normalised by its own BB
+- EV bb/100 the same, with all-in runouts replaced by their expected value (see engine/allin.py)
+
+Besides the counters, `blocks` keeps each label's results per 100-hand block of a
+match (see engine/evaluation.py), the unit the confidence intervals are built on.
 """
 
 import math
+
+BLOCK = 100   # hands per evaluation block
 
 COUNTERS = ("hands", "vpip", "pfr", "threebet", "threebet_opp", "saw_flop", "wtsd", "wsd", "wsd_n",
             "post_aggr", "post_calls", "folds", "matches", "wins", "busts", "placement_sum",
@@ -22,7 +28,7 @@ COUNTERS = ("hands", "vpip", "pfr", "threebet", "threebet_opp", "saw_flop", "wts
 
 def empty() -> dict:
     d = {k: 0 for k in COUNTERS}
-    d.update(bb_sum=0.0, bb_sumsq=0.0, match_net=[])
+    d.update(bb_sum=0.0, bb_sumsq=0.0, bb_ev_sum=0.0, bb_ev_sumsq=0.0, match_net=[])
     return d
 
 
@@ -31,6 +37,10 @@ class StatsTracker:
         self.labels = labels                     # seat -> label
         self.stats = {l: empty() for l in dict.fromkeys(labels)}
         self.series: list[list[float]] = []      # per hand: net bb per label, in self.stats order
+        # label -> block index -> [bb, bb_ev, seat-hands]; plus hands played per block
+        self.blocks = {l: {} for l in self.stats}
+        self.block_hands: dict[int, int] = {}
+        self.adjust: dict[int, float] = {}       # seat -> all-in luck for the current hand (chips)
 
     def _s(self, seat):
         return self.stats[self.labels[int(seat)]]
@@ -39,6 +49,7 @@ class StatsTracker:
         t = m["type"]
         if t == "hand_start":
             self.bb = m["big_blind"]
+            self.adjust = {}
             self.start = {int(s): v for s, v in m["stacks"].items()}
             self.live = set(self.start)
             self.pf_raises = 1                   # the big blind counts as the first bet
@@ -69,7 +80,11 @@ class StatsTracker:
         elif t == "street_dealt" and m["street"] == "flop":
             for s in self.live:
                 self.flags[s].add("saw_flop")
+        elif t == "allin_ev":
+            self.adjust = {int(k): v for k, v in m["adjust"].items()}
         elif t == "hand_result":
+            blk = (m["hand_number"]) // BLOCK
+            self.block_hands[blk] = self.block_hands.get(blk, 0) + 1
             winners = {w["seat"] for w in m["winners"]}
             showdown = len(m["showdown"]) >= 2
             row = dict.fromkeys(self.stats, 0.0)
@@ -79,9 +94,16 @@ class StatsTracker:
                 net = m["stacks"][str(s)] - start
                 st["net_chips"] += net
                 bb = net / self.bb
+                ev = bb + self.adjust.get(s, 0.0) / self.bb   # all-in luck removed
                 row[self.labels[s]] += bb
                 st["bb_sum"] += bb
                 st["bb_sumsq"] += bb * bb
+                st["bb_ev_sum"] += ev
+                st["bb_ev_sumsq"] += ev * ev
+                cell = self.blocks[self.labels[s]].setdefault(blk, [0.0, 0.0, 0])
+                cell[0] += bb
+                cell[1] += ev
+                cell[2] += 1
                 for key, flag in (("vpip", "vpip"), ("pfr", "pfr"), ("threebet", "3bet"),
                                   ("threebet_opp", "3bet_opp"), ("saw_flop", "saw_flop")):
                     st[key] += flag in f
@@ -150,7 +172,8 @@ def summarise(stats: dict) -> list[dict]:
 
 
 COLUMNS = [("bot", "bot", 16), ("hands", "hands", 8), ("bb_per_100", "bb/100", 9),
-           ("bb_per_100_ci95", "+-95%", 8), ("avg_place", "place", 6), ("win_rate", "win%", 6),
+           ("bb_per_100_ci95", "+-95%", 8), ("bb_per_100_ev", "EV bb/100", 9), ("ev_ci95", "+-95%", 8),
+           ("sd_100", "SD/100", 7), ("avg_place", "place", 6), ("win_rate", "win%", 6),
            ("bust_rate", "bust%", 6), ("vpip", "VPIP", 6), ("pfr", "PFR", 6), ("threebet", "3B", 6),
            ("af", "AF", 6), ("wtsd", "WTSD", 6), ("wsd", "W$SD", 6), ("bot_errors", "errs", 5)]
 
